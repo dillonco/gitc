@@ -68,6 +68,7 @@ pub struct CommitNode {
     author: String,
     relative_date: String,
     subject: String,
+    body_summary: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -158,8 +159,9 @@ fn get_commit_graph(state: State<'_, AppState>, limit: usize) -> Result<CommitGr
         &[
             "log",
             "--all",
+            "--topo-order",
             "--date=relative",
-            "--format=%H%x1f%P%x1f%D%x1f%an%x1f%ar%x1f%s",
+            "--format=%H%x1f%P%x1f%D%x1f%an%x1f%ar%x1f%s%x1f%b%x1e",
             "-n",
             &limit,
         ],
@@ -286,6 +288,30 @@ fn open_terminal(state: State<'_, AppState>) -> Result<GitResult, String> {
 }
 
 #[tauri::command]
+fn pick_repository_folder() -> Result<Option<String>, String> {
+    let result = run_command(
+        Command::new("osascript").args([
+            "-e",
+            "try\nset chosenFolder to choose folder with prompt \"Select a repository folder\"\nreturn POSIX path of chosenFolder\non error number -128\nreturn \"\"\nend try",
+        ]),
+        false,
+    );
+
+    if result.ok {
+        let path = result.stdout.trim();
+        Ok((!path.is_empty()).then_some(path.to_string()))
+    } else if result.stderr.contains("User canceled.") || result.code == -128 {
+        Ok(None)
+    } else {
+        Err(if result.stderr.trim().is_empty() {
+            "unable to open folder picker".to_string()
+        } else {
+            result.stderr
+        })
+    }
+}
+
+#[tauri::command]
 fn create_repository(state: State<'_, AppState>, path: String) -> Result<RepositoryState, String> {
     let root = PathBuf::from(path);
     fs::create_dir_all(&root).map_err(|err| err.to_string())?;
@@ -354,6 +380,7 @@ pub fn run() {
             run_git_action,
             set_repository_path,
             open_terminal,
+            pick_repository_folder,
             create_repository,
             clone_repository,
             apply_hunk,
@@ -665,10 +692,14 @@ fn parse_worktrees(out: &str) -> Vec<String> {
 }
 
 fn parse_commit_graph(out: &str) -> Vec<CommitNode> {
-    out.lines()
-        .filter_map(|line| {
-            let fields: Vec<&str> = line.split('\u{1f}').collect();
-            if fields.len() != 6 {
+    out.split('\u{1e}')
+        .filter_map(|record| {
+            let record = record.trim_matches('\n');
+            if record.trim().is_empty() {
+                return None;
+            }
+            let fields: Vec<&str> = record.split('\u{1f}').collect();
+            if fields.len() != 7 {
                 return None;
             }
             Some(CommitNode {
@@ -688,8 +719,20 @@ fn parse_commit_graph(out: &str) -> Vec<CommitNode> {
                 author: fields[3].to_string(),
                 relative_date: fields[4].to_string(),
                 subject: fields[5].to_string(),
+                body_summary: summarize_commit_body(fields[6]),
             })
         })
+        .collect()
+}
+
+fn summarize_commit_body(body: &str) -> String {
+    body.lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<&str>>()
+        .join(" ")
+        .chars()
+        .take(180)
         .collect()
 }
 

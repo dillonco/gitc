@@ -39,6 +39,7 @@ export interface CommitNode {
   author: string;
   relativeDate: string;
   subject: string;
+  bodySummary: string;
 }
 
 export interface CommitGraph {

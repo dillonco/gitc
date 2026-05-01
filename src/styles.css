@@ -100,6 +100,7 @@ p {
 }
 
 .tab-wrap {
+  position: relative;
   display: flex;
   align-items: stretch;
 }
@@ -110,6 +111,7 @@ p {
   gap: 10px;
   min-width: 145px;
   height: 50px;
+  padding-right: 34px;
   border-left: 1px solid #343943;
   border-radius: 0;
   color: #b9bec6;
@@ -125,14 +127,17 @@ p {
 }
 
 .tab-close {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
   border: 0;
   background: transparent;
   color: inherit;
   font-size: 18px;
   line-height: 1;
   opacity: 0.75;
-  padding: 0 10px 0 0;
-  align-self: center;
+  padding: 0;
 }
 
 .tab-close:hover {
@@ -441,7 +446,7 @@ small {
 
 .graph-head {
   display: grid;
-  grid-template-columns: 170px 100px minmax(0, 1fr);
+  grid-template-columns: 210px minmax(520px, 58vw) minmax(360px, 1fr) max-content;
   height: 34px;
   border-bottom: 1px solid #2b303a;
   background: #262a32;
@@ -466,10 +471,11 @@ small {
 .wip-row,
 .commit-row {
   display: grid;
-  grid-template-columns: 170px 100px minmax(0, 1fr) max-content;
+  grid-template-columns: 210px minmax(520px, 58vw) minmax(360px, 1fr) max-content;
   align-items: center;
   width: 100%;
-  min-height: 34px;
+  min-width: 1180px;
+  min-height: 52px;
 }
 
 .wip-row {
@@ -487,37 +493,85 @@ small {
   font-weight: 800;
 }
 
+.wip-graph {
+  position: relative;
+  height: 52px;
+  background: rgba(12, 15, 20, 0.12);
+}
+
+.wip-rail {
+  position: absolute;
+  top: 50%;
+  bottom: -2px;
+  left: 24px;
+  width: 3px;
+  border-radius: 3px;
+  background: #26c6da;
+}
+
 .wip-node {
-  width: 24px;
-  height: 24px;
-  margin-left: 34px;
-  border: 3px dotted #3aa3b4;
+  position: absolute;
+  top: 50%;
+  left: 25.5px;
+  width: 26px;
+  height: 26px;
+  transform: translate(-50%, -50%);
+  border: 4px dotted #26c6da;
   border-radius: 50%;
+  background: #1b1e24;
+  box-shadow:
+    0 0 0 2px #1b1e24,
+    0 0 14px color-mix(in srgb, #26c6da 42%, transparent);
+}
+
+.wip-summary {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  padding-left: 12px;
 }
 
 .wip-message {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 14px;
-  width: 100%;
-  min-height: 34px;
+  min-width: 194px;
+  min-height: 36px;
+  border: 1px solid #3a404b;
+  border-radius: 6px;
+  background: #1e222b;
   padding: 0 12px;
   text-align: left;
 }
 
-.wip-message strong {
+.wip-message > strong {
   color: #9aa5b5;
   font-weight: 800;
 }
 
-.wip-message span {
-  color: #9bd889;
-  font-weight: 800;
+.wip-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 58px;
+  height: 36px;
+  border-radius: 4px;
+  background: rgba(245, 166, 35, 0.12);
+  color: #f3f6fa;
+  font-size: 18px;
+  font-weight: 900;
 }
 
-.wip-message small {
-  color: #c0c7d1;
+.wip-pencil {
+  color: #f5a623;
+  font-size: 18px;
+}
+
+.wip-count strong {
+  color: #f3f6fa;
+  font-weight: 900;
 }
 
 .commit-row {
@@ -527,12 +581,20 @@ small {
   text-align: left;
 }
 
+.commit-row:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.015);
+}
+
 .commit-row:hover:not(:disabled),
 .commit-row.active {
   background: #222630;
 }
 
 .branch-cell {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
   overflow: hidden;
   padding: 0 12px;
   color: #8fd0df;
@@ -541,35 +603,80 @@ small {
   white-space: nowrap;
 }
 
+.ref-pill {
+  display: inline-flex;
+  max-width: 180px;
+  align-items: center;
+  overflow: hidden;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--ref-color) 28%, #1b1e24);
+  box-shadow: inset 3px 0 0 var(--ref-color);
+  padding: 4px 8px;
+  color: #f0f3f7;
+  font-size: 12px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+}
+
 .graph-cell {
   position: relative;
-  display: flex;
-  align-items: center;
-  height: 34px;
-  padding-left: 42px;
+  height: 52px;
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px) 0 0 / 44px 100%,
+    rgba(12, 15, 20, 0.12);
 }
 
-.lane {
+.graph-rail {
   position: absolute;
-  left: calc(46px + var(--lane) * 6px);
-  width: 2px;
-  height: 36px;
-  background: #2f95a5;
+  top: -2px;
+  bottom: -2px;
+  left: calc(24px + var(--lane) * 34px);
+  z-index: 1;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--lane-color);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--lane-color) 32%, transparent);
 }
 
-.dot {
-  position: relative;
-  z-index: 1;
-  width: 15px;
-  height: 15px;
-  border: 2px solid #37a6b8;
+.graph-edge {
+  position: absolute;
+  top: 50%;
+  left: calc(25.5px + var(--from) * 34px);
+  z-index: 2;
+  width: calc(var(--span) * 34px);
+  height: 3px;
+  transform: translateY(-50%);
+  border-radius: 3px;
+  background: var(--lane-color);
+}
+
+.commit-dot {
+  position: absolute;
+  top: 50%;
+  left: calc(25.5px + var(--lane) * 34px);
+  z-index: 3;
+  display: grid;
+  width: 26px;
+  height: 26px;
+  transform: translate(-50%, -50%);
+  place-items: center;
+  border: 3px solid var(--lane-color);
   border-radius: 50%;
-  background: #1b1e24;
+  background: #171a20;
+  color: #f5f7fa;
+  font-size: 9px;
+  font-weight: 900;
+  box-shadow:
+    0 0 0 2px #171a20,
+    0 0 16px color-mix(in srgb, var(--lane-color) 46%, transparent);
 }
 
 .commit-main {
   display: grid;
   min-width: 0;
+  gap: 3px;
+  padding: 0 14px;
 }
 
 .commit-main strong,
@@ -580,8 +687,29 @@ small {
 }
 
 .commit-main strong {
+  display: flex;
+  min-width: 0;
+  gap: 10px;
   color: #d9dee5;
   font-size: 14px;
+}
+
+.commit-main strong span,
+.commit-main strong em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commit-main strong span {
+  flex: 0 1 auto;
+}
+
+.commit-main strong em {
+  flex: 1 1 auto;
+  color: #8f96a1;
+  font-style: normal;
+  font-weight: 600;
 }
 
 .commit-main small {

@@ -21,6 +21,10 @@ export function openTerminal(): Promise<GitResult> {
   return invoke("open_terminal");
 }
 
+export function pickRepositoryFolder(): Promise<string | null> {
+  return invoke<string | null>("pick_repository_folder");
+}
+
 export function createRepository(path: string): Promise<RepositoryState> {
   return invoke("create_repository", { path });
 }

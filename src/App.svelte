@@ -11,6 +11,7 @@
     getFileHistory,
     getRepositoryState,
     openTerminal,
+    pickRepositoryFolder,
     runGitAction,
     saveConflictResolution,
     setRepositoryPath,
@@ -24,6 +25,26 @@
     kind: "launchpad" | "repo";
     label: string;
     path?: string;
+  };
+
+  type GraphLane = {
+    index: number;
+    color: string;
+  };
+
+  type GraphEdge = {
+    from: number;
+    to: number;
+    color: string;
+  };
+
+  type GraphRow = {
+    commit: CommitNode;
+    lane: number;
+    lanes: GraphLane[];
+    edges: GraphEdge[];
+    color: string;
+    labels: string[];
   };
 
   let state: RepositoryState | null = null;
@@ -60,6 +81,20 @@
   let notice = "";
 
   const riskyActions = new Set(["discard", "reset", "forcePush", "stashDrop"]);
+  const graphColors = [
+    "#26c6da",
+    "#2f80ed",
+    "#c33cff",
+    "#f33bd2",
+    "#f94144",
+    "#ff7a45",
+    "#f5d547",
+    "#8be34b",
+    "#20d6a3",
+    "#33b5e5",
+    "#3167d9",
+    "#9c27b0",
+  ];
   const recentRepos = [
     { name: "gitc", path: "/Users/dillon/Documents/dev/gitc" },
     { name: "meetings", path: "/Users/dillon/Documents/dev/meetings" },
@@ -87,6 +122,8 @@
   $: visibleStaged = sortFiles(staged);
   $: diffRows = parseDiffRows(selectedDiff?.diff ?? "");
   $: hunkRows = diffRows.map((row, index) => ({ row, index })).filter((item) => item.row.kind === "hunk");
+  $: graphRows = buildGraphRows(commits);
+  $: graphLaneCount = Math.max(8, ...graphRows.flatMap((row) => row.lanes.map((lane) => lane.index + 1)), 1);
 
   async function refresh() {
     busy = true;
@@ -246,9 +283,9 @@
   }
 
   async function switchRepository() {
-    const path = prompt("Repository path", state?.root ?? "");
-    if (!path?.trim()) return;
-    await openRepositoryPath(path.trim());
+    const path = await pickRepositoryFolder();
+    if (!path) return;
+    await openRepositoryPath(path);
   }
 
   async function openClonePrompt() {
@@ -362,6 +399,73 @@
       });
   }
 
+  function laneColor(index: number) {
+    return graphColors[index % graphColors.length];
+  }
+
+  function refLabels(commit: CommitNode) {
+    return commit.refs
+      .map((ref) => ref.replace(/^HEAD -> /, "").replace(/^tag: /, "tag:"))
+      .filter((ref) => ref && !ref.includes("origin/HEAD"));
+  }
+
+  function authorInitials(author: string) {
+    return author
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join("") || "G";
+  }
+
+  function buildGraphRows(nodes: CommitNode[]): GraphRow[] {
+    const lanes: string[] = [];
+    const rows: GraphRow[] = [];
+
+    for (const commit of nodes) {
+      let lane = lanes.indexOf(commit.hash);
+      if (lane === -1) {
+        lane = lanes.findIndex((value) => value === "");
+        if (lane === -1) lane = lanes.length;
+        lanes[lane] = commit.hash;
+      }
+
+      const visibleLanes = lanes
+        .map((hash, index) => ({ hash, index }))
+        .filter((item) => item.hash)
+        .map((item) => ({ index: item.index, color: laneColor(item.index) }));
+
+      const firstParent = commit.parents[0] ?? "";
+      if (firstParent) {
+        lanes[lane] = firstParent;
+      } else {
+        lanes[lane] = "";
+      }
+
+      const edges: GraphEdge[] = [];
+      for (const parent of commit.parents.slice(1)) {
+        let parentLane = lanes.indexOf(parent);
+        if (parentLane === -1) {
+          parentLane = lanes.findIndex((value) => value === "");
+          if (parentLane === -1) parentLane = lanes.length;
+          lanes[parentLane] = parent;
+        }
+        edges.push({ from: lane, to: parentLane, color: laneColor(parentLane) });
+      }
+
+      rows.push({
+        commit,
+        lane,
+        lanes: visibleLanes,
+        edges,
+        color: laneColor(lane),
+        labels: refLabels(commit),
+      });
+    }
+
+    return rows;
+  }
+
   function fileStageAction() {
     if (!selectedFile) return;
     if (selectedFile.group === "staged") {
@@ -383,6 +487,12 @@
   function showAddRepoNotice() {
     activeTabId = "launchpad";
     centerMode = "launchpad";
+  }
+
+  async function openFromPicker() {
+    const path = await pickRepositoryFolder();
+    if (!path) return;
+    await openRepositoryPath(path);
   }
 
   function moveHunk(direction: 1 | -1) {
@@ -568,7 +678,7 @@
       <div class="launchpad">
         <h1>Repositories</h1>
         <div class="launch-actions">
-          <button on:click={switchRepository}>▰ Open</button>
+          <button on:click={openFromPicker}>▰ Open</button>
           <button on:click={openClonePrompt}>☁ Clone</button>
           <button on:click={openCreatePrompt}>⊞ Create</button>
         </div>
@@ -661,25 +771,47 @@
       <div class="graph-scroll">
         <div class="wip-row">
           <div class="branch-chip">✓ {currentBranch}</div>
-          <div class="wip-node"></div>
-          <button class="wip-message" on:click={() => (selectedCommit = null)}>
-            <strong>// WIP</strong>
-            <span>{unstagedTotal} + {staged.length}</span>
-            <small>{totalChanges} changed files</small>
-          </button>
+          <div class="wip-graph">
+            <span class="wip-rail"></span>
+            <span class="wip-node"></span>
+          </div>
+          <div class="wip-summary">
+            <button class="wip-message" on:click={() => (selectedCommit = null)}>
+              <strong>// WIP</strong>
+            </button>
+            <span class="wip-count" title={`${totalChanges} WIP file changes`}>
+              <span class="wip-pencil">✎</span>
+              <strong>{totalChanges}</strong>
+            </span>
+          </div>
         </div>
-        {#each commits as commit, index}
-          <button class="commit-row" class:active={selectedCommit?.hash === commit.hash} on:click={() => (selectedCommit = commit)}>
-            <span class="branch-cell">{index === 0 ? currentBranch : ""}</span>
-            <span class="graph-cell">
-              <span class="lane" style={`--lane:${index % 5}`}></span>
-              <span class="dot"></span>
+        {#each graphRows as row}
+          <button class="commit-row" class:active={selectedCommit?.hash === row.commit.hash} on:click={() => (selectedCommit = row.commit)}>
+            <span class="branch-cell">
+              {#each row.labels as label}
+                <span class="ref-pill" style={`--ref-color:${row.color}`}>{label}</span>
+              {/each}
+            </span>
+            <span class="graph-cell" style={`--lane-count:${graphLaneCount}`}>
+              {#each row.lanes as lane}
+                <span class="graph-rail" style={`--lane:${lane.index}; --lane-color:${lane.color}`}></span>
+              {/each}
+              {#each row.edges as edge}
+                <span
+                  class="graph-edge"
+                  style={`--from:${Math.min(edge.from, edge.to)}; --span:${Math.abs(edge.to - edge.from) || 1}; --lane-color:${edge.color}`}
+                ></span>
+              {/each}
+              <span class="commit-dot" style={`--lane:${row.lane}; --lane-color:${row.color}`}>{authorInitials(row.commit.author)}</span>
             </span>
             <span class="commit-main">
-              <strong>{commit.subject}</strong>
-              <small>{commit.shortHash} · {commit.author} · {commit.relativeDate}</small>
+              <strong>
+                <span>{row.commit.subject}</span>
+                {#if row.commit.bodySummary}<em>{row.commit.bodySummary}</em>{/if}
+              </strong>
+              <small>{row.commit.shortHash} · {row.commit.author} · {row.commit.relativeDate}{row.labels.length ? ` · ${row.labels.join(" ")}` : ""}</small>
             </span>
-            <span class="refs">{commit.refs.join(" ")}</span>
+            <span class="refs">{row.labels.join(" ")}</span>
           </button>
         {:else}
           <p class="empty centered">No commits yet</p>
