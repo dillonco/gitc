@@ -42,6 +42,8 @@
   type GraphLane = {
     index: number;
     color: string;
+    capStart: boolean;
+    capEnd: boolean;
   };
 
   type GraphEdge = {
@@ -599,18 +601,24 @@
 
     for (const commit of nodes) {
       let lane = lanes.indexOf(commit.hash);
+      let laneIsNew = false;
       if (lane === -1) {
         lane = lanes.findIndex((value) => value === "");
         if (lane === -1) lane = lanes.length;
         lanes[lane] = commit.hash;
+        laneIsNew = true;
       }
 
+      const firstParent = commit.parents[0] ?? "";
       const visibleLanes = lanes
         .map((hash, index) => ({ hash, index }))
         .filter((item) => item.hash)
-        .map((item) => ({ index: item.index, color: laneColor(item.index) }));
-
-      const firstParent = commit.parents[0] ?? "";
+        .map((item) => ({
+          index: item.index,
+          color: laneColor(item.index),
+          capStart: item.index === lane && laneIsNew,
+          capEnd: item.index === lane && !firstParent,
+        }));
       if (firstParent) {
         lanes[lane] = firstParent;
       } else {
@@ -1151,11 +1159,18 @@
             </span>
             <span class="graph-cell" style={`--lane-count:${graphLaneCount}`}>
               {#each row.lanes as lane}
-                <span class="graph-rail" style={`--lane:${lane.index}; --lane-color:${lane.color}`}></span>
+                <span
+                  class="graph-rail"
+                  class:rail-start={lane.capStart}
+                  class:rail-end={lane.capEnd}
+                  style={`--lane:${lane.index}; --lane-color:${lane.color}`}
+                ></span>
               {/each}
               {#each row.edges as edge}
                 <span
                   class="graph-edge"
+                  class:edge-right={edge.to >= edge.from}
+                  class:edge-left={edge.to < edge.from}
                   style={`--from:${Math.min(edge.from, edge.to)}; --span:${Math.abs(edge.to - edge.from) || 1}; --lane-color:${edge.color}`}
                 ></span>
               {/each}
