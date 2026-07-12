@@ -616,7 +616,8 @@
         .map((item) => ({
           index: item.index,
           color: laneColor(item.index),
-          capStart: item.index === lane && laneIsNew,
+          // The topmost lane-0 commit stays uncapped so the WIP connector reaches its dot.
+          capStart: item.index === lane && laneIsNew && !(rows.length === 0 && lane === 0),
           capEnd: item.index === lane && !firstParent,
         }));
       if (firstParent) {

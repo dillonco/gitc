@@ -644,7 +644,7 @@ small {
 .wip-rail {
   position: absolute;
   top: 50%;
-  bottom: -1px;
+  bottom: -2px;
   left: 24.5px;
   width: 2px;
   background: linear-gradient(180deg, color-mix(in srgb, #26c6da 80%, #ffffff 8%), #26c6da);
@@ -661,9 +661,7 @@ small {
   border: 3px dotted #26c6da;
   border-radius: 50%;
   background: linear-gradient(160deg, #20262f, #14171d);
-  box-shadow:
-    0 0 0 2px rgba(27, 30, 36, 0.92),
-    0 0 10px color-mix(in srgb, #26c6da 36%, transparent);
+  box-shadow: 0 0 10px color-mix(in srgb, #26c6da 36%, transparent);
 }
 
 .wip-summary {
@@ -777,14 +775,13 @@ small {
   align-self: stretch;
   height: auto;
   min-height: 52px;
-  overflow: hidden;
   background: rgba(12, 15, 20, 0.12);
 }
 
 .graph-rail {
   position: absolute;
-  top: -1px;
-  bottom: -1px;
+  top: -2px;
+  bottom: -2px;
   left: calc(24.5px + var(--lane) * 34px);
   z-index: 1;
   width: 2px;
@@ -808,7 +805,7 @@ small {
 .graph-edge {
   position: absolute;
   top: calc(50% - 1px);
-  bottom: -1px;
+  bottom: -2px;
   left: calc(25.5px + var(--from) * 34px);
   z-index: 2;
   width: calc(var(--span) * 34px + 1px);
@@ -844,9 +841,7 @@ small {
   font-size: 8px;
   font-weight: 800;
   letter-spacing: 0.02em;
-  box-shadow:
-    0 0 0 2px rgba(23, 26, 32, 0.92),
-    0 0 9px color-mix(in srgb, var(--lane-color) 34%, transparent);
+  box-shadow: 0 0 9px color-mix(in srgb, var(--lane-color) 34%, transparent);
 }
 
 .commit-main {
