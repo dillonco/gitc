@@ -186,6 +186,7 @@
   }
 
   function saveSettings() {
+    settings.graphLimit = Math.min(1000, Math.max(25, Math.round(Number(settings.graphLimit)) || 250));
     try {
       localStorage.setItem("gitc:settings", JSON.stringify(settings));
     } catch {
