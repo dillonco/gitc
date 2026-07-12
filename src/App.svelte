@@ -1093,12 +1093,12 @@
             </button>
           </div>
           <div class="segmented">
-            <button class:active={fileViewMode === "file"} on:click={() => setFileViewMode("file")}>File View</button>
-            <button class:active={fileViewMode === "diff"} on:click={() => setFileViewMode("diff")}>Diff View</button>
-          </div>
-          <div class="diff-tool-group">
+            <button class:active={fileViewMode === "diff"} on:click={() => setFileViewMode("diff")}>Diff</button>
+            <button class:active={fileViewMode === "file"} on:click={() => setFileViewMode("file")}>File</button>
             <button class:active={fileViewMode === "blame"} on:click={() => setFileViewMode("blame")}>Blame</button>
             <button class:active={fileViewMode === "history"} on:click={() => setFileViewMode("history")}>History</button>
+          </div>
+          <div class="diff-tool-group">
             <button title="Previous hunk" on:click={() => moveHunk(-1)}>↑</button>
             <button title="Next hunk" on:click={() => moveHunk(1)}>↓</button>
             <button title="Unified" class:active={!splitDiff} on:click={() => (splitDiff = false)}>▣</button>
@@ -1153,10 +1153,13 @@
         </div>
         {#each visibleGraphRows as row}
           <button class="commit-row" class:active={selectedCommit?.hash === row.commit.hash} on:click={() => selectCommit(row.commit)}>
-            <span class="branch-cell">
-              {#each row.labels as label}
-                <span class="ref-pill" style={`--ref-color:${row.color}`}>{label}</span>
-              {/each}
+            <span class="branch-cell" title={row.labels.join("  ")}>
+              {#if row.labels.length}
+                <span class="ref-pill" style={`--ref-color:${row.color}`}>{row.labels[0]}</span>
+                {#if row.labels.length > 1}
+                  <span class="ref-pill more-pill" style={`--ref-color:${row.color}`}>+{row.labels.length - 1}</span>
+                {/if}
+              {/if}
             </span>
             <span class="graph-cell" style={`--lane-count:${graphLaneCount}`}>
               {#each row.lanes as lane}
@@ -1182,9 +1185,8 @@
                 <span>{row.commit.subject}</span>
                 {#if row.commit.bodySummary}<em>{row.commit.bodySummary}</em>{/if}
               </strong>
-              <small>{row.commit.shortHash} · {row.commit.author} · {row.commit.relativeDate}{row.labels.length ? ` · ${row.labels.join(" ")}` : ""}</small>
+              <small>{row.commit.shortHash} · {row.commit.author} · {row.commit.relativeDate}</small>
             </span>
-            <span class="refs">{row.labels.join(" ")}</span>
           </button>
         {:else}
           <p class="empty centered">{searchOpen && searchQuery.trim() ? "No commits match the search" : "No commits yet"}</p>

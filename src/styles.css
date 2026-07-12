@@ -204,6 +204,7 @@ p {
   display: grid;
   align-content: center;
   gap: 3px;
+  min-width: 0;
   border-right: 1px solid #454a54;
   border-top: 0;
   border-bottom: 0;
@@ -225,8 +226,11 @@ p {
 
 .repo-select strong,
 .branch-select strong {
+  overflow: hidden;
   color: #f2f4f7;
-  font-size: 17px;
+  font-size: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .top-actions,
@@ -409,8 +413,17 @@ p {
 
 .branch-row.active .branch-name {
   border-color: #3eb2c3;
-  background: #216b7a;
+  background: linear-gradient(180deg, #257689, #1c5b6a);
   color: #ffffff;
+}
+
+.branch-row.active .branch-name:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.branch-row.active .branch-name small {
+  color: #b7dde6;
 }
 
 .stash-row {
@@ -584,7 +597,7 @@ small {
 
 .graph-head {
   display: grid;
-  grid-template-columns: 210px minmax(520px, 58vw) minmax(360px, 1fr) max-content;
+  grid-template-columns: 210px minmax(520px, 58vw) minmax(360px, 1fr);
   height: 34px;
   border-bottom: 1px solid #262a32;
   background: linear-gradient(180deg, #292d36, #24282f);
@@ -609,7 +622,7 @@ small {
 .wip-row,
 .commit-row {
   display: grid;
-  grid-template-columns: 210px minmax(520px, 58vw) minmax(360px, 1fr) max-content;
+  grid-template-columns: 210px minmax(520px, 58vw) minmax(360px, 1fr);
   align-items: center;
   width: 100%;
   min-width: 1180px;
@@ -622,14 +635,18 @@ small {
 
 .branch-chip {
   width: max-content;
-  max-width: 150px;
+  max-width: 186px;
   margin-left: 12px;
+  overflow: hidden;
   border: 1px solid #2f8496;
   border-radius: 4px;
   background: linear-gradient(180deg, #2a7c8f, #1e5b6a);
   padding: 5px 9px;
   color: #f1fbff;
+  font-size: 13px;
   font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
 }
 
@@ -718,6 +735,7 @@ small {
   border: 0;
   border-radius: 0;
   background: transparent;
+  padding: 0;
   text-align: left;
 }
 
@@ -738,19 +756,29 @@ small {
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   overflow: hidden;
   padding: 0 12px;
   color: #8fd0df;
   font-size: 12px;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.branch-cell .ref-pill {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.branch-cell .more-pill {
+  flex: none;
+  padding: 3px 6px;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.35);
+  color: #dbe4ee;
+}
+
 .ref-pill {
-  display: inline-flex;
+  display: inline-block;
   max-width: 180px;
-  align-items: center;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--ref-color) 42%, #1b1e24);
   border-radius: 4px;
@@ -851,8 +879,7 @@ small {
   padding: 0 14px;
 }
 
-.commit-main strong,
-.refs {
+.commit-main strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -886,12 +913,6 @@ small {
 
 .commit-main small {
   color: #838d9a;
-  font-size: 11px;
-}
-
-.refs {
-  padding-right: 14px;
-  color: #81c7a6;
   font-size: 11px;
 }
 
@@ -977,13 +998,23 @@ small {
   margin-left: auto;
 }
 
+.file-diff-toolbar .segmented,
+.diff-tool-group,
+.diff-tool-group button {
+  flex: none;
+}
+
 .diff-tool-group button,
 .file-diff-toolbar .segmented button {
+  min-width: 0;
   min-height: 30px;
+  padding: 0 12px;
   border-color: #454d59;
   border-radius: 0;
   background: #20252d;
+  font-size: 13px;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .file-diff-toolbar .segmented button.active {
