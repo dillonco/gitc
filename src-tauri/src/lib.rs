@@ -54,8 +54,11 @@ pub struct RepositoryState {
     files: Vec<FileStatus>,
     branches: Vec<Branch>,
     remotes: Vec<String>,
+    remote_branches: Vec<String>,
+    tags: Vec<String>,
     worktrees: Vec<String>,
     stashes: Vec<StashEntry>,
+    user_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -75,6 +78,29 @@ pub struct CommitNode {
 #[serde(rename_all = "camelCase")]
 pub struct CommitGraph {
     commits: Vec<CommitNode>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommitFileChange {
+    status: String,
+    path: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommitDetail {
+    hash: String,
+    short_hash: String,
+    parents: Vec<String>,
+    refs: Vec<String>,
+    author: String,
+    email: String,
+    date: String,
+    relative_date: String,
+    subject: String,
+    body: String,
+    files: Vec<CommitFileChange>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -121,8 +147,12 @@ pub struct FileDiff {
 #[tauri::command]
 fn get_repository_state(state: State<'_, AppState>) -> Result<RepositoryState, String> {
     let root = active_repo(&state)?;
-    let current_branch = git_optional(&root, &["branch", "--show-current"])?;
-    let head = git_optional(&root, &["rev-parse", "--short", "HEAD"])?
+    repository_state(&root)
+}
+
+fn repository_state(root: &Path) -> Result<RepositoryState, String> {
+    let current_branch = git_optional(root, &["branch", "--show-current"])?;
+    let head = git_optional(root, &["rev-parse", "--short", "HEAD"])?
         .unwrap_or_else(|| "unborn".to_string());
     let git_dir = root.join(".git");
 
@@ -145,19 +175,38 @@ fn get_repository_state(state: State<'_, AppState>) -> Result<RepositoryState, S
             .filter(|line| !line.trim().is_empty())
             .map(ToOwned::to_owned)
             .collect(),
+        remote_branches: git(&root, &["branch", "-r", "--format=%(refname:short)"])?
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty() && !line.ends_with("/HEAD"))
+            .map(ToOwned::to_owned)
+            .collect(),
+        tags: git(&root, &["tag", "--sort=-creatordate"])?
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty())
+            .map(ToOwned::to_owned)
+            .collect(),
         worktrees: parse_worktrees(&git(&root, &["worktree", "list", "--porcelain"])?),
         stashes: parse_stashes(&git(&root, &["stash", "list"])?),
+        user_name: git_optional(&root, &["config", "user.name"])?,
     })
 }
 
 #[tauri::command]
 fn get_commit_graph(state: State<'_, AppState>, limit: usize) -> Result<CommitGraph, String> {
     let root = active_repo(&state)?;
+    commit_graph(&root, limit)
+}
+
+fn commit_graph(root: &Path, limit: usize) -> Result<CommitGraph, String> {
     let limit = limit.clamp(25, 1000).to_string();
+    // Exclude refs/stash: its synthetic two/three-parent commits render as bogus merges.
     let out = git(
-        &root,
+        root,
         &[
             "log",
+            "--exclude=refs/stash",
             "--all",
             "--topo-order",
             "--date=relative",
@@ -173,6 +222,94 @@ fn get_commit_graph(state: State<'_, AppState>, limit: usize) -> Result<CommitGr
 }
 
 #[tauri::command]
+fn get_commit_detail(state: State<'_, AppState>, hash: String) -> Result<CommitDetail, String> {
+    let root = active_repo(&state)?;
+    commit_detail(&root, &hash)
+}
+
+fn commit_detail(root: &Path, hash: &str) -> Result<CommitDetail, String> {
+    validate_ref_arg(hash)?;
+    let meta = git(
+        root,
+        &[
+            "show",
+            "--no-patch",
+            "--date=format:%Y-%m-%d %H:%M",
+            "--format=%H%x1f%P%x1f%D%x1f%an%x1f%ae%x1f%ad%x1f%ar%x1f%s%x1f%b",
+            hash,
+        ],
+    )?;
+    let fields: Vec<&str> = meta.split('\u{1f}').collect();
+    if fields.len() != 9 {
+        return Err("unable to parse commit metadata".to_string());
+    }
+
+    let parents: Vec<String> = fields[1]
+        .split_whitespace()
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
+        .collect();
+
+    // `git show --name-status` prints nothing for merge commits, so diff
+    // against the first parent explicitly; root commits keep `git show`.
+    let name_status = if let Some(parent) = parents.first() {
+        git(root, &["diff", "--name-status", parent, hash])?
+    } else {
+        git(root, &["show", "--name-status", "--format=", hash])?
+    };
+
+    Ok(CommitDetail {
+        hash: fields[0].to_string(),
+        short_hash: fields[0].chars().take(8).collect(),
+        parents,
+        refs: fields[2]
+            .split(',')
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(ToOwned::to_owned)
+            .collect(),
+        author: fields[3].to_string(),
+        email: fields[4].to_string(),
+        date: fields[5].to_string(),
+        relative_date: fields[6].to_string(),
+        subject: fields[7].to_string(),
+        body: fields[8].trim().to_string(),
+        files: parse_name_status(&name_status),
+    })
+}
+
+#[tauri::command]
+fn get_commit_file_diff(
+    state: State<'_, AppState>,
+    hash: String,
+    path: String,
+) -> Result<FileDiff, String> {
+    let root = active_repo(&state)?;
+    commit_file_diff(&root, &hash, path)
+}
+
+fn commit_file_diff(root: &Path, hash: &str, path: String) -> Result<FileDiff, String> {
+    validate_ref_arg(hash)?;
+    validate_repo_relative_path(&path)?;
+
+    // Diff against the first parent so merge commits show real hunks;
+    // `git show` alone suppresses merge diffs. Root commits have no parent.
+    let parent = git_optional(root, &["rev-parse", &format!("{hash}^")])?;
+    let diff = if let Some(parent) = parent {
+        git_optional(root, &["diff", &parent, hash, "--", &path])?.unwrap_or_default()
+    } else {
+        git_optional(root, &["show", "--format=", hash, "--", &path])?.unwrap_or_default()
+    };
+
+    Ok(FileDiff {
+        path,
+        staged: false,
+        binary: diff.contains("Binary files") || diff.contains("GIT binary patch"),
+        diff,
+    })
+}
+
+#[tauri::command]
 fn run_git_action(state: State<'_, AppState>, action: GitAction) -> Result<GitResult, String> {
     let root = active_repo(&state)?;
     let args = action_args(&action)?;
@@ -182,14 +319,18 @@ fn run_git_action(state: State<'_, AppState>, action: GitAction) -> Result<GitRe
 #[tauri::command]
 fn get_conflict_file(state: State<'_, AppState>, path: String) -> Result<ConflictFile, String> {
     let root = active_repo(&state)?;
+    conflict_file(&root, path)
+}
+
+fn conflict_file(root: &Path, path: String) -> Result<ConflictFile, String> {
     validate_repo_relative_path(&path)?;
     let working = fs::read_to_string(root.join(&path)).map_err(|err| err.to_string())?;
 
     Ok(ConflictFile {
         path: path.clone(),
-        base: git_optional(&root, &["show", &format!(":1:{path}")])?,
-        ours: git_optional(&root, &["show", &format!(":2:{path}")])?,
-        theirs: git_optional(&root, &["show", &format!(":3:{path}")])?,
+        base: git_optional(root, &["show", &format!(":1:{path}")])?,
+        ours: git_optional(root, &["show", &format!(":2:{path}")])?,
+        theirs: git_optional(root, &["show", &format!(":3:{path}")])?,
         working,
     })
 }
@@ -377,6 +518,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_repository_state,
             get_commit_graph,
+            get_commit_detail,
+            get_commit_file_diff,
             run_git_action,
             set_repository_path,
             open_terminal,
@@ -525,13 +668,33 @@ fn action_args(action: &GitAction) -> Result<Vec<&str>, String> {
         "stage" => vec!["add", required(path, "path")?],
         "unstage" => vec!["restore", "--staged", required(path, "path")?],
         "discard" => vec!["restore", required(path, "path")?],
+        "cleanUntracked" => vec!["clean", "-f", "--", required(path, "path")?],
         "commit" => vec!["commit", "-m", required(message, "message")?],
         "commitAmend" => vec!["commit", "--amend", "-m", required(message, "message")?],
         "checkoutBranch" => vec!["checkout", required(branch, "branch")?],
-        "createBranch" => vec!["checkout", "-b", required(branch, "branch")?],
+        "createBranch" => {
+            let mut args = vec!["checkout", "-b", required(branch, "branch")?];
+            if let Some(target) = target.filter(|value| !value.trim().is_empty()) {
+                args.push(target);
+            }
+            args
+        }
+        "deleteBranch" => vec!["branch", "-d", required(branch, "branch")?],
+        "deleteBranchForce" => vec!["branch", "-D", required(branch, "branch")?],
+        "checkoutRemote" => vec!["checkout", "--track", required(target, "target")?],
+        "checkoutCommit" => vec!["checkout", "--detach", required(target, "target")?],
+        "createTag" => {
+            let mut args = vec!["tag", required(branch, "branch")?];
+            if let Some(target) = target.filter(|value| !value.trim().is_empty()) {
+                args.push(target);
+            }
+            args
+        }
+        "deleteTag" => vec!["tag", "-d", required(branch, "branch")?],
         "fetch" => vec!["fetch", remote],
+        "fetchAll" => vec!["fetch", "--all", "--prune"],
         "pull" => vec!["pull", "--ff-only", remote],
-        "push" => vec!["push", remote, "HEAD"],
+        "push" => vec!["push", "-u", remote, "HEAD"],
         "forcePush" => vec!["push", "--force-with-lease", remote, "HEAD"],
         "stashCreate" => vec!["stash", "push", "-u", "-m", message.unwrap_or("gitc stash")],
         "stashApply" => vec!["stash", "apply", required(target, "target")?],
@@ -544,6 +707,7 @@ fn action_args(action: &GitAction) -> Result<Vec<&str>, String> {
         "rebaseContinue" => vec!["rebase", "--continue"],
         "rebaseAbort" => vec!["rebase", "--abort"],
         "cherryPick" => vec!["cherry-pick", required(target, "target")?],
+        "revert" => vec!["revert", "--no-edit", required(target, "target")?],
         "reset" => vec![
             "reset",
             reset_flag(action.mode.as_deref())?,
@@ -555,6 +719,9 @@ fn action_args(action: &GitAction) -> Result<Vec<&str>, String> {
 
     if let Some(path) = path {
         validate_repo_relative_path(path)?;
+    }
+    for value in [branch, target, action.remote.as_deref()].into_iter().flatten() {
+        validate_ref_arg(value)?;
     }
     Ok(args)
 }
@@ -572,6 +739,35 @@ fn reset_flag(mode: Option<&str>) -> Result<&'static str, String> {
         "hard" => Ok("--hard"),
         other => Err(format!("unsupported reset mode: {other}")),
     }
+}
+
+fn validate_ref_arg(value: &str) -> Result<(), String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() || trimmed.starts_with('-') {
+        return Err(format!("invalid ref argument: {value:?}"));
+    }
+    Ok(())
+}
+
+fn parse_name_status(out: &str) -> Vec<CommitFileChange> {
+    out.lines()
+        .filter_map(|line| {
+            let mut parts = line.split('\t');
+            let status = parts.next()?.trim();
+            if status.is_empty() {
+                return None;
+            }
+            // Renames/copies list "R100\told\tnew" — show the new path.
+            let path = parts.next_back()?.trim();
+            if path.is_empty() {
+                return None;
+            }
+            Some(CommitFileChange {
+                status: status.chars().take(1).collect(),
+                path: path.to_string(),
+            })
+        })
+        .collect()
 }
 
 fn validate_repo_relative_path(path: &str) -> Result<(), String> {
@@ -618,7 +814,20 @@ fn parse_status(out: &str) -> Vec<FileStatus> {
             match parts.first().copied() {
                 Some("1") | Some("2") if parts.len() >= 9 => {
                     let xy = parts[1];
-                    let path = parts[8..].join(" ");
+                    // "1" lines: path starts at field 8. "2" (rename/copy) lines carry an
+                    // extra score field ("R100") at 8, then "newpath<TAB>oldpath" — show
+                    // the new path only.
+                    let path = if parts[0] == "2" {
+                        line.split('\t')
+                            .next()
+                            .and_then(|head| {
+                                let fields: Vec<&str> = head.split_whitespace().collect();
+                                (fields.len() >= 10).then(|| fields[9..].join(" "))
+                            })
+                            .unwrap_or_else(|| parts[8..].join(" "))
+                    } else {
+                        parts[8..].join(" ")
+                    };
                     let index = xy.chars().next().unwrap_or('.');
                     let worktree = xy.chars().nth(1).unwrap_or('.');
                     let mut files = Vec::new();
@@ -659,6 +868,10 @@ fn parse_branches(out: &str) -> Vec<Branch> {
             let mut parts = line.split('\t');
             let head = parts.next()?;
             let name = parts.next()?.to_string();
+            // Detached HEAD emits a "(HEAD detached at abc1234)" pseudo-branch.
+            if name.starts_with('(') {
+                return None;
+            }
             let upstream = parts
                 .next()
                 .filter(|value| !value.is_empty())
@@ -757,6 +970,27 @@ u UU N... 100644 100644 100644 100644 a b c d conflicted.txt";
     }
 
     #[test]
+    fn parses_porcelain_v2_rename_with_new_path() {
+        let out = "2 R. N... 100644 100644 100644 df967b df967b R100 renamed.txt\told.txt";
+        let files = parse_status(out);
+
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].group, FileGroup::Staged);
+        assert_eq!(files[0].path, "renamed.txt");
+        assert_eq!(files[0].index, "R");
+    }
+
+    #[test]
+    fn drops_detached_head_pseudo_branch() {
+        let out = "*\t(HEAD detached at 7d24eb3)\t\n \tmain\torigin/main";
+        let branches = parse_branches(out);
+
+        assert_eq!(branches.len(), 1);
+        assert_eq!(branches[0].name, "main");
+        assert!(!branches[0].current);
+    }
+
+    #[test]
     fn splits_partially_staged_files_into_both_sections() {
         let out = "1 MM N... 100644 100644 100644 abc def src/lib.rs";
         let files = parse_status(out);
@@ -809,6 +1043,56 @@ u UU N... 100644 100644 100644 100644 a b c d conflicted.txt";
     }
 
     #[test]
+    fn rejects_option_like_ref_arguments() {
+        let action = GitAction {
+            kind: "checkoutBranch".to_string(),
+            path: None,
+            message: None,
+            branch: Some("--force".to_string()),
+            target: None,
+            remote: None,
+            mode: None,
+        };
+
+        assert!(action_args(&action).is_err());
+        assert!(validate_ref_arg("main").is_ok());
+        assert!(validate_ref_arg("stash@{0}").is_ok());
+        assert!(validate_ref_arg("-d").is_err());
+        assert!(validate_ref_arg("  ").is_err());
+    }
+
+    #[test]
+    fn builds_create_branch_with_start_point() {
+        let action = GitAction {
+            kind: "createBranch".to_string(),
+            path: None,
+            message: None,
+            branch: Some("feature/x".to_string()),
+            target: Some("abc123".to_string()),
+            remote: None,
+            mode: None,
+        };
+
+        assert_eq!(
+            action_args(&action).unwrap(),
+            vec!["checkout", "-b", "feature/x", "abc123"]
+        );
+    }
+
+    #[test]
+    fn parses_name_status_with_renames() {
+        let out = "M\tsrc/App.svelte\nA\tsrc/lib/new.ts\nR100\told/name.ts\tnew/name.ts\nD\tgone.txt";
+        let files = parse_name_status(out);
+
+        assert_eq!(files.len(), 4);
+        assert_eq!(files[0].status, "M");
+        assert_eq!(files[0].path, "src/App.svelte");
+        assert_eq!(files[2].status, "R");
+        assert_eq!(files[2].path, "new/name.ts");
+        assert_eq!(files[3].status, "D");
+    }
+
+    #[test]
     fn builds_amend_commit_args() {
         let action = GitAction {
             kind: "commitAmend".to_string(),
@@ -824,5 +1108,239 @@ u UU N... 100644 100644 100644 100644 a b c d conflicted.txt";
             action_args(&action).unwrap(),
             vec!["commit", "--amend", "-m", "summary\n\ndescription"]
         );
+    }
+}
+
+// End-to-end tests that drive the real git CLI in throwaway repositories.
+#[cfg(test)]
+mod git_integration_tests {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    static REPO_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+    struct TempRepo(PathBuf);
+
+    impl TempRepo {
+        fn new() -> Self {
+            let dir = std::env::temp_dir().join(format!(
+                "gitc-test-{}-{}",
+                std::process::id(),
+                REPO_COUNTER.fetch_add(1, Ordering::SeqCst)
+            ));
+            fs::create_dir_all(&dir).expect("create temp repo dir");
+            run(&dir, &["init", "-b", "main"]);
+            run(&dir, &["config", "user.email", "test@gitc.dev"]);
+            run(&dir, &["config", "user.name", "Test User"]);
+            run(&dir, &["config", "commit.gpgsign", "false"]);
+            TempRepo(dir)
+        }
+
+        fn path(&self) -> &Path {
+            &self.0
+        }
+    }
+
+    impl Drop for TempRepo {
+        fn drop(&mut self) {
+            fs::remove_dir_all(&self.0).ok();
+        }
+    }
+
+    fn run(root: &Path, args: &[&str]) -> GitResult {
+        let result = run_git(root, args);
+        assert!(result.ok, "git {args:?} failed: {}", result.stderr);
+        result
+    }
+
+    fn write_file(root: &Path, name: &str, content: &str) {
+        fs::write(root.join(name), content).expect("write file");
+    }
+
+    fn commit_all(root: &Path, message: &str) {
+        run(root, &["add", "-A"]);
+        run(root, &["commit", "-m", message]);
+    }
+
+    #[test]
+    fn reports_status_groups_from_a_real_repository() {
+        let repo = TempRepo::new();
+        write_file(repo.path(), "a.txt", "one\n");
+        commit_all(repo.path(), "init");
+
+        write_file(repo.path(), "a.txt", "two\n");
+        write_file(repo.path(), "b.txt", "new\n");
+        run(repo.path(), &["add", "b.txt"]);
+
+        let state = repository_state(repo.path()).unwrap();
+        assert_eq!(state.current_branch.as_deref(), Some("main"));
+        assert!(!state.merging);
+        assert!(state
+            .files
+            .iter()
+            .any(|file| file.path == "a.txt" && file.group == FileGroup::Unstaged));
+        assert!(state
+            .files
+            .iter()
+            .any(|file| file.path == "b.txt" && file.group == FileGroup::Staged));
+    }
+
+    #[test]
+    fn reports_staged_rename_under_its_new_path() {
+        let repo = TempRepo::new();
+        write_file(repo.path(), "old.txt", "content\n");
+        commit_all(repo.path(), "init");
+        run(repo.path(), &["mv", "old.txt", "new.txt"]);
+
+        let state = repository_state(repo.path()).unwrap();
+        let staged: Vec<_> = state
+            .files
+            .iter()
+            .filter(|file| file.group == FileGroup::Staged)
+            .collect();
+        assert_eq!(staged.len(), 1, "files: {:?}", state.files);
+        assert_eq!(staged[0].path, "new.txt");
+    }
+
+    #[test]
+    fn lists_stashes_tags_and_remote_state() {
+        let repo = TempRepo::new();
+        write_file(repo.path(), "a.txt", "one\n");
+        commit_all(repo.path(), "init");
+        run(repo.path(), &["tag", "v1.0.0"]);
+        write_file(repo.path(), "a.txt", "dirty\n");
+        run(repo.path(), &["stash", "push", "-m", "wip work"]);
+
+        let state = repository_state(repo.path()).unwrap();
+        assert_eq!(state.tags, vec!["v1.0.0".to_string()]);
+        assert_eq!(state.stashes.len(), 1);
+        assert_eq!(state.stashes[0].name, "stash@{0}");
+        assert!(state.stashes[0].message.contains("wip work"));
+        assert_eq!(state.user_name.as_deref(), Some("Test User"));
+    }
+
+    #[test]
+    fn merge_commit_detail_diffs_against_first_parent() {
+        let repo = TempRepo::new();
+        write_file(repo.path(), "base.txt", "base\n");
+        commit_all(repo.path(), "base");
+        run(repo.path(), &["checkout", "-b", "feature"]);
+        write_file(repo.path(), "feature.txt", "feature\n");
+        commit_all(repo.path(), "feature work");
+        run(repo.path(), &["checkout", "main"]);
+        write_file(repo.path(), "main.txt", "main\n");
+        commit_all(repo.path(), "main work");
+        run(repo.path(), &["merge", "--no-ff", "feature", "-m", "merge feature"]);
+
+        let head = git(repo.path(), &["rev-parse", "HEAD"]).unwrap();
+        let detail = commit_detail(repo.path(), &head).unwrap();
+        assert_eq!(detail.subject, "merge feature");
+        assert_eq!(detail.parents.len(), 2);
+        assert!(
+            detail
+                .files
+                .iter()
+                .any(|file| file.path == "feature.txt" && file.status == "A"),
+            "merge detail files: {:?}",
+            detail.files
+        );
+
+        let diff = commit_file_diff(repo.path(), &head, "feature.txt".to_string()).unwrap();
+        assert!(diff.diff.contains("+feature"), "diff: {}", diff.diff);
+    }
+
+    #[test]
+    fn commit_graph_skips_stash_refs_and_orders_topologically() {
+        let repo = TempRepo::new();
+        write_file(repo.path(), "a.txt", "one\n");
+        commit_all(repo.path(), "first");
+        write_file(repo.path(), "a.txt", "two\n");
+        commit_all(repo.path(), "second");
+        write_file(repo.path(), "a.txt", "dirty\n");
+        run(repo.path(), &["stash", "push", "-m", "noise"]);
+
+        let graph = commit_graph(repo.path(), 50).unwrap();
+        assert_eq!(graph.commits.len(), 2, "stash refs must not appear");
+        assert_eq!(graph.commits[0].subject, "second");
+        assert_eq!(graph.commits[1].subject, "first");
+        assert_eq!(graph.commits[0].parents.len(), 1);
+        assert!(graph.commits[0].refs.iter().any(|r| r.contains("main")));
+    }
+
+    #[test]
+    fn commit_graph_is_empty_for_a_fresh_repository() {
+        let repo = TempRepo::new();
+        let graph = commit_graph(repo.path(), 50).unwrap();
+        assert!(graph.commits.is_empty());
+
+        let state = repository_state(repo.path()).unwrap();
+        assert_eq!(state.head, "unborn");
+        assert!(state.files.is_empty());
+    }
+
+    #[test]
+    fn conflict_exposes_base_ours_theirs_and_merging_state() {
+        let repo = TempRepo::new();
+        write_file(repo.path(), "file.txt", "base\n");
+        commit_all(repo.path(), "base");
+        run(repo.path(), &["checkout", "-b", "feature"]);
+        write_file(repo.path(), "file.txt", "theirs\n");
+        commit_all(repo.path(), "theirs");
+        run(repo.path(), &["checkout", "main"]);
+        write_file(repo.path(), "file.txt", "ours\n");
+        commit_all(repo.path(), "ours");
+
+        let merge = run_git(repo.path(), &["merge", "feature"]);
+        assert!(!merge.ok, "merge must conflict");
+
+        let state = repository_state(repo.path()).unwrap();
+        assert!(state.merging);
+        assert!(state
+            .files
+            .iter()
+            .any(|file| file.path == "file.txt" && file.group == FileGroup::Conflicted));
+
+        let conflict = conflict_file(repo.path(), "file.txt".to_string()).unwrap();
+        assert_eq!(conflict.base.as_deref(), Some("base"));
+        assert_eq!(conflict.ours.as_deref(), Some("ours"));
+        assert_eq!(conflict.theirs.as_deref(), Some("theirs"));
+        assert!(conflict.working.contains("<<<<<<<"));
+
+        // Resolve, mark resolved, and confirm the conflict clears.
+        fs::write(repo.path().join("file.txt"), "resolved\n").unwrap();
+        run(repo.path(), &["add", "file.txt"]);
+        let state = repository_state(repo.path()).unwrap();
+        assert!(!state
+            .files
+            .iter()
+            .any(|file| file.group == FileGroup::Conflicted));
+    }
+
+    #[test]
+    fn detached_head_yields_no_phantom_branch() {
+        let repo = TempRepo::new();
+        write_file(repo.path(), "a.txt", "one\n");
+        commit_all(repo.path(), "first");
+        run(repo.path(), &["checkout", "--detach", "HEAD"]);
+
+        let state = repository_state(repo.path()).unwrap();
+        assert!(state.current_branch.is_none());
+        assert_eq!(state.branches.len(), 1);
+        assert_eq!(state.branches[0].name, "main");
+        assert!(!state.branches[0].current);
+    }
+
+    #[test]
+    fn untracked_file_diff_renders_synthetic_patch() {
+        let repo = TempRepo::new();
+        write_file(repo.path(), "a.txt", "one\n");
+        commit_all(repo.path(), "init");
+        write_file(repo.path(), "notes.md", "hello\nworld\n");
+
+        let diff = render_untracked_file_diff(repo.path(), "notes.md").unwrap();
+        assert!(diff.contains("--- /dev/null"));
+        assert!(diff.contains("+hello"));
+        assert!(diff.contains("+world"));
+        assert!(!diff.contains("\\ No newline at end of file"));
     }
 }

@@ -5,6 +5,32 @@
   background: #1b1e24;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 6px;
+  background: #3a4049;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #4a515c;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 * {
@@ -89,8 +115,8 @@ p {
   display: grid;
   grid-template-columns: minmax(0, 1fr) max-content;
   align-items: center;
-  border-bottom: 1px solid #2a2e36;
-  background: #292c34;
+  border-bottom: 1px solid #22252c;
+  background: linear-gradient(180deg, #2e323b, #272a32);
 }
 
 .tabs {
@@ -122,7 +148,8 @@ p {
 }
 
 .tab.active {
-  background: #22262e;
+  background: linear-gradient(180deg, #262b34, #20242c);
+  box-shadow: inset 0 2px 0 #37b8cd;
   color: #f3f5f7;
 }
 
@@ -168,8 +195,8 @@ p {
   grid-column: 1 / -1;
   display: grid;
   grid-template-columns: 160px 220px minmax(0, 1fr) 180px;
-  border-bottom: 1px solid #353a43;
-  background: #343840;
+  border-bottom: 1px solid #2c3038;
+  background: linear-gradient(180deg, #3a3e48, #30343d);
 }
 
 .repo-select,
@@ -177,6 +204,7 @@ p {
   display: grid;
   align-content: center;
   gap: 3px;
+  min-width: 0;
   border-right: 1px solid #454a54;
   border-top: 0;
   border-bottom: 0;
@@ -198,8 +226,11 @@ p {
 
 .repo-select strong,
 .branch-select strong {
+  overflow: hidden;
   color: #f2f4f7;
-  font-size: 17px;
+  font-size: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .top-actions,
@@ -213,7 +244,33 @@ p {
 }
 
 .search-actions {
+  position: relative;
   justify-content: flex-end;
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  right: 6px;
+  z-index: 30;
+  display: grid;
+  min-width: 220px;
+  gap: 2px;
+  border: 1px solid #3d4450;
+  border-radius: 5px;
+  background: linear-gradient(180deg, #282d36, #22262e);
+  box-shadow: 0 14px 34px rgb(0 0 0 / 0.5);
+  padding: 6px;
+}
+
+.dropdown-menu button {
+  display: block;
+  justify-items: start;
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 13px;
+  text-align: left;
+  white-space: nowrap;
 }
 
 .top-actions button,
@@ -236,9 +293,17 @@ p {
 
 .left-panel {
   grid-row: 3;
+  display: flex;
+  flex-direction: column;
   border-right: 1px solid #303540;
   background: #282c34;
   overflow: hidden;
+}
+
+.nav-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .view-tabs {
@@ -305,19 +370,99 @@ p {
   padding: 0 10px 10px;
 }
 
-.branch-list button {
+.branch-list .branch-name {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   justify-items: start;
+  min-width: 0;
   min-height: 30px;
   background: #222831;
   text-align: left;
 }
 
-.branch-list button.active {
+.branch-list .branch-name > span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.branch-row {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  min-width: 0;
+}
+
+.branch-row .branch-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.branch-row .row-action {
+  flex: none;
+  width: 28px;
+  background: #222831;
+  opacity: 0;
+}
+
+.branch-row:hover .row-action,
+.branch-row .row-action:focus-visible {
+  opacity: 1;
+}
+
+.branch-row.active .branch-name {
   border-color: #3eb2c3;
-  background: #216b7a;
+  background: linear-gradient(180deg, #257689, #1c5b6a);
   color: #ffffff;
+}
+
+.branch-row.active .branch-name:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.branch-row.active .branch-name small {
+  color: #b7dde6;
+}
+
+.stash-row {
+  display: grid;
+  gap: 6px;
+  border: 1px solid #333944;
+  border-radius: 3px;
+  background: #222831;
+  padding: 7px 8px;
+}
+
+.stash-info {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.stash-info span {
+  color: #b7d8f5;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.stash-info small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stash-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.stash-actions button {
+  min-height: 24px;
+  padding: 0 8px;
+  border-color: #45505b;
+  font-size: 11px;
 }
 
 .branch-list small,
@@ -377,10 +522,16 @@ small {
   min-height: 90px;
   border-color: #3d424e;
   border-radius: 7px;
-  background: #292d36;
+  background: linear-gradient(180deg, #2d323c, #262a33);
   color: #f3f5f7;
   font-size: 28px;
   font-weight: 500;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.28);
+}
+
+.launch-actions button:hover:not(:disabled) {
+  border-color: #4b5361;
+  background: linear-gradient(180deg, #333947, #2a2f3a);
 }
 
 .recent-repos {
@@ -446,10 +597,10 @@ small {
 
 .graph-head {
   display: grid;
-  grid-template-columns: 210px minmax(520px, 58vw) minmax(360px, 1fr) max-content;
+  grid-template-columns: 210px minmax(520px, 58vw) minmax(360px, 1fr);
   height: 34px;
-  border-bottom: 1px solid #2b303a;
-  background: #262a32;
+  border-bottom: 1px solid #262a32;
+  background: linear-gradient(180deg, #292d36, #24282f);
   color: #8f96a1;
   font-size: 12px;
   font-weight: 800;
@@ -471,7 +622,7 @@ small {
 .wip-row,
 .commit-row {
   display: grid;
-  grid-template-columns: 210px minmax(520px, 58vw) minmax(360px, 1fr) max-content;
+  grid-template-columns: 210px minmax(520px, 58vw) minmax(360px, 1fr);
   align-items: center;
   width: 100%;
   min-width: 1180px;
@@ -484,18 +635,26 @@ small {
 
 .branch-chip {
   width: max-content;
-  max-width: 150px;
+  max-width: 186px;
   margin-left: 12px;
-  border-radius: 3px;
-  background: #236878;
-  padding: 6px 9px;
+  overflow: hidden;
+  border: 1px solid #2f8496;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #2a7c8f, #1e5b6a);
+  padding: 5px 9px;
   color: #f1fbff;
+  font-size: 13px;
   font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
 }
 
 .wip-graph {
   position: relative;
-  height: 52px;
+  align-self: stretch;
+  height: auto;
+  min-height: 52px;
   background: rgba(12, 15, 20, 0.12);
 }
 
@@ -503,25 +662,23 @@ small {
   position: absolute;
   top: 50%;
   bottom: -2px;
-  left: 24px;
-  width: 3px;
-  border-radius: 3px;
-  background: #26c6da;
+  left: 24.5px;
+  width: 2px;
+  background: linear-gradient(180deg, color-mix(in srgb, #26c6da 80%, #ffffff 8%), #26c6da);
+  box-shadow: 0 0 7px color-mix(in srgb, #26c6da 26%, transparent);
 }
 
 .wip-node {
   position: absolute;
   top: 50%;
   left: 25.5px;
-  width: 26px;
-  height: 26px;
+  width: 20px;
+  height: 20px;
   transform: translate(-50%, -50%);
-  border: 4px dotted #26c6da;
+  border: 3px dotted #26c6da;
   border-radius: 50%;
-  background: #1b1e24;
-  box-shadow:
-    0 0 0 2px #1b1e24,
-    0 0 14px color-mix(in srgb, #26c6da 42%, transparent);
+  background: linear-gradient(160deg, #20262f, #14171d);
+  box-shadow: 0 0 10px color-mix(in srgb, #26c6da 36%, transparent);
 }
 
 .wip-summary {
@@ -578,6 +735,7 @@ small {
   border: 0;
   border-radius: 0;
   background: transparent;
+  padding: 0;
   text-align: left;
 }
 
@@ -585,70 +743,113 @@ small {
   background: rgba(255, 255, 255, 0.015);
 }
 
-.commit-row:hover:not(:disabled),
+.commit-row:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.028);
+}
+
 .commit-row.active {
-  background: #222630;
+  background: linear-gradient(90deg, rgba(63, 118, 200, 0.22), rgba(63, 118, 200, 0.05));
+  box-shadow: inset 3px 0 0 #3f76c8;
 }
 
 .branch-cell {
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   overflow: hidden;
   padding: 0 12px;
   color: #8fd0df;
   font-size: 12px;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.branch-cell .ref-pill {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.branch-cell .more-pill {
+  flex: none;
+  padding: 3px 6px;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.35);
+  color: #dbe4ee;
+}
+
 .ref-pill {
-  display: inline-flex;
+  display: inline-block;
   max-width: 180px;
-  align-items: center;
   overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--ref-color) 42%, #1b1e24);
   border-radius: 4px;
-  background: color-mix(in srgb, var(--ref-color) 28%, #1b1e24);
-  box-shadow: inset 3px 0 0 var(--ref-color);
-  padding: 4px 8px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--ref-color) 34%, #232730),
+    color-mix(in srgb, var(--ref-color) 20%, #191c22)
+  );
+  box-shadow:
+    inset 3px 0 0 var(--ref-color),
+    0 1px 3px rgb(0 0 0 / 0.35);
+  padding: 3px 8px;
   color: #f0f3f7;
   font-size: 12px;
   font-weight: 800;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .graph-cell {
   position: relative;
-  height: 52px;
-  overflow: hidden;
-  background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px) 0 0 / 44px 100%,
-    rgba(12, 15, 20, 0.12);
+  align-self: stretch;
+  height: auto;
+  min-height: 52px;
+  background: rgba(12, 15, 20, 0.12);
 }
 
 .graph-rail {
   position: absolute;
   top: -2px;
   bottom: -2px;
-  left: calc(24px + var(--lane) * 34px);
+  left: calc(24.5px + var(--lane) * 34px);
   z-index: 1;
-  width: 3px;
-  border-radius: 3px;
-  background: var(--lane-color);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--lane-color) 32%, transparent);
+  width: 2px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--lane-color) 82%, #ffffff 6%),
+    var(--lane-color) 55%,
+    color-mix(in srgb, var(--lane-color) 86%, #10131a)
+  );
+  box-shadow: 0 0 7px color-mix(in srgb, var(--lane-color) 26%, transparent);
+}
+
+.graph-rail.rail-start {
+  top: 50%;
+}
+
+.graph-rail.rail-end {
+  bottom: 50%;
 }
 
 .graph-edge {
   position: absolute;
-  top: 50%;
+  top: calc(50% - 1px);
+  bottom: -2px;
   left: calc(25.5px + var(--from) * 34px);
   z-index: 2;
-  width: calc(var(--span) * 34px);
-  height: 3px;
-  transform: translateY(-50%);
-  border-radius: 3px;
-  background: var(--lane-color);
+  width: calc(var(--span) * 34px + 1px);
+  border-top: 2px solid var(--lane-color);
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--lane-color) 28%, transparent));
+}
+
+.graph-edge.edge-right {
+  border-right: 2px solid var(--lane-color);
+  border-top-right-radius: 10px;
+}
+
+.graph-edge.edge-left {
+  left: calc(25.5px + var(--from) * 34px - 1px);
+  border-left: 2px solid var(--lane-color);
+  border-top-left-radius: 10px;
 }
 
 .commit-dot {
@@ -657,19 +858,18 @@ small {
   left: calc(25.5px + var(--lane) * 34px);
   z-index: 3;
   display: grid;
-  width: 26px;
-  height: 26px;
+  width: 20px;
+  height: 20px;
   transform: translate(-50%, -50%);
   place-items: center;
-  border: 3px solid var(--lane-color);
+  border: 2px solid var(--lane-color);
   border-radius: 50%;
-  background: #171a20;
-  color: #f5f7fa;
-  font-size: 9px;
-  font-weight: 900;
-  box-shadow:
-    0 0 0 2px #171a20,
-    0 0 16px color-mix(in srgb, var(--lane-color) 46%, transparent);
+  background: linear-gradient(160deg, #232935, #14171d);
+  color: #eef2f7;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  box-shadow: 0 0 9px color-mix(in srgb, var(--lane-color) 34%, transparent);
 }
 
 .commit-main {
@@ -679,8 +879,7 @@ small {
   padding: 0 14px;
 }
 
-.commit-main strong,
-.refs {
+.commit-main strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -714,12 +913,6 @@ small {
 
 .commit-main small {
   color: #838d9a;
-  font-size: 11px;
-}
-
-.refs {
-  padding-right: 14px;
-  color: #81c7a6;
   font-size: 11px;
 }
 
@@ -780,14 +973,22 @@ small {
 }
 
 .stage-file {
-  border-color: #5d8b5c;
-  background: #263b34;
-  color: #d8f5d2;
+  border-color: #3f7a4d;
+  background: linear-gradient(180deg, #2f6e44, #245534);
+  color: #e9fbe4;
   font-weight: 800;
+  text-shadow: 0 1px 1px rgb(0 0 0 / 0.3);
+}
+
+.stage-file:hover:not(:disabled) {
+  border-color: #4f9a60;
+  background: linear-gradient(180deg, #377e4f, #2a613c);
 }
 
 .file-diff-toolbar {
   justify-content: center;
+  justify-content: safe center;
+  overflow-x: auto;
   border-bottom: 1px solid #313741;
   background: #1d2128;
   padding: 0 14px;
@@ -797,13 +998,23 @@ small {
   margin-left: auto;
 }
 
+.file-diff-toolbar .segmented,
+.diff-tool-group,
+.diff-tool-group button {
+  flex: none;
+}
+
 .diff-tool-group button,
 .file-diff-toolbar .segmented button {
+  min-width: 0;
   min-height: 30px;
+  padding: 0 12px;
   border-color: #454d59;
   border-radius: 0;
   background: #20252d;
+  font-size: 13px;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .file-diff-toolbar .segmented button.active {
@@ -956,8 +1167,9 @@ small {
 }
 
 .segmented button.active {
-  background: #46506a;
+  background: linear-gradient(180deg, #4d5a78, #3e4962);
   color: #ffffff;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08);
 }
 
 .change-list {
@@ -978,15 +1190,22 @@ small {
 }
 
 .change-group-head button {
-  border-color: #5d8b5c;
-  color: #c9efc7;
+  border-color: #3f7a4d;
+  background: linear-gradient(180deg, #2c5a3c, #224731);
+  color: #dff5da;
   font-weight: 800;
+}
+
+.change-group-head button:hover:not(:disabled) {
+  border-color: #4f9a60;
+  background: linear-gradient(180deg, #336846, #285238);
 }
 
 .change-group-head .section-toggle {
   flex: 1;
   justify-content: flex-start;
   border-color: transparent;
+  background: transparent;
   color: #cfd4db;
   padding: 0;
   text-align: left;
@@ -1004,6 +1223,10 @@ small {
 .file-group {
   border-bottom: 1px solid #333944;
   padding: 0;
+}
+
+.file-group.hidden {
+  display: none;
 }
 
 .file-group h2 {
@@ -1154,10 +1377,19 @@ summary {
 .commit-button {
   width: 100%;
   min-height: 48px;
-  border-color: #578356;
-  background: #263b34;
-  color: #d8f5d2;
+  border-color: #3f7a4d;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #338052 0%, #26603a 100%);
+  color: #eefbea;
+  font-size: 15px;
   font-weight: 800;
+  text-shadow: 0 1px 1px rgb(0 0 0 / 0.3);
+  box-shadow: 0 1px 5px rgb(0 0 0 / 0.3);
+}
+
+.commit-button:hover:not(:disabled) {
+  border-color: #4f9a60;
+  background: linear-gradient(180deg, #3a8f5c 0%, #2c6e43 100%);
 }
 
 .merge-editor {
@@ -1239,6 +1471,313 @@ summary {
   min-height: 0;
   border: 0;
   border-radius: 0;
+}
+
+.conflict-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #8a6b31;
+  background: #2d2517;
+  color: #ffe9bd;
+  font-weight: 700;
+}
+
+.banner-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.banner-actions button {
+  min-height: 26px;
+  border-color: #8a6b31;
+  padding: 0 12px;
+}
+
+.at-commit {
+  overflow: hidden;
+  color: #8f96a1;
+  font-size: 12px;
+  font-style: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-diff-shell.commit-context {
+  grid-template-rows: 52px minmax(0, 1fr);
+}
+
+.hunk-count {
+  margin-right: auto;
+  color: #97a0ad;
+  font-size: 12px;
+}
+
+.meta-row code {
+  color: #8d96a3;
+  font-style: italic;
+}
+
+.split-line {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) 58px minmax(0, 1fr);
+  min-height: 22px;
+}
+
+.split-line .line-no {
+  border-right: 1px solid #3a404a;
+  color: #8d96a3;
+  text-align: right;
+  padding: 0 12px;
+  user-select: none;
+}
+
+.split-line code {
+  overflow: hidden;
+  border-right: 1px solid #2a2f38;
+  padding: 0 12px;
+  color: #d8dee6;
+  text-overflow: ellipsis;
+  white-space: pre;
+}
+
+.split-line .del-cell {
+  background: #3a2328;
+  color: #ffd5dc;
+}
+
+.split-line .add-cell {
+  background: #23382c;
+  color: #c8f4c3;
+}
+
+.split-line .blank-cell {
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.split-full {
+  grid-template-columns: minmax(0, 1fr);
+  padding: 0 12px;
+}
+
+.tree-dir {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 30px;
+  border-radius: 0;
+  padding-left: calc(8px + var(--depth, 0) * 16px);
+  color: #aab4c2;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.tree-dir strong {
+  color: #c6cfdb;
+}
+
+.file-row.tree-row {
+  padding-left: calc(8px + var(--depth, 0) * 16px);
+}
+
+.commit-detail {
+  display: grid;
+  grid-row: 1 / -1;
+  grid-template-rows: 48px minmax(0, 1fr);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.commit-detail-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 12px;
+}
+
+.commit-meta {
+  display: grid;
+  gap: 8px;
+  border-bottom: 1px solid #353b45;
+  padding-bottom: 14px;
+}
+
+.commit-meta h2 {
+  color: #eef1f5;
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.commit-body {
+  color: #aeb5bf;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.commit-meta-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.commit-meta-line div {
+  display: grid;
+  gap: 1px;
+}
+
+.author-badge {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  place-items: center;
+  border: 2px solid #26c6da;
+  border-radius: 50%;
+  background: linear-gradient(160deg, #232935, #14171d);
+  color: #f5f7fa;
+  font-size: 10px;
+  font-weight: 800;
+  box-shadow: 0 0 8px color-mix(in srgb, #26c6da 30%, transparent);
+}
+
+.detail-refs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.commit-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+  padding: 14px 0 6px;
+}
+
+.commit-actions button {
+  min-height: 30px;
+  border-color: #45505b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.reset-mode-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 12px;
+}
+
+.reset-mode-row label {
+  color: #9aa1ac;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: lowercase;
+}
+
+.reset-mode-row select {
+  width: auto;
+  min-width: 110px;
+}
+
+.commit-files {
+  display: grid;
+  gap: 2px;
+  border-top: 1px solid #353b45;
+  padding-top: 12px;
+}
+
+.commit-files h3 {
+  margin: 0 0 8px;
+  color: #cfd4db;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.commit-file-row {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 0 6px;
+  text-align: left;
+}
+
+.commit-file-row.active {
+  background: #354057;
+  border-color: #46557a;
+}
+
+.commit-file-row strong {
+  overflow: hidden;
+  color: #d6dbe1;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commit-file-row span {
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-weight: 800;
+  text-align: center;
+}
+
+.status-a {
+  color: #8be34b;
+}
+
+.status-m {
+  color: #f5d547;
+}
+
+.status-d {
+  color: #ff8b8b;
+}
+
+.status-r,
+.status-c {
+  color: #33b5e5;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  background: rgb(9 11 14 / 0.62);
+}
+
+.modal {
+  width: min(520px, calc(100vw - 48px));
+  border: 1px solid #3a424e;
+  border-radius: 6px;
+  background: #21252d;
+  box-shadow: 0 24px 60px rgb(0 0 0 / 0.55);
+  overflow: hidden;
+}
+
+.modal-body {
+  display: grid;
+  gap: 14px;
+  padding: 16px 14px;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid #303743;
+  padding: 12px 14px;
+}
+
+.modal-footer button {
+  min-width: 96px;
+  border-color: #45505b;
 }
 
 .status-bar {

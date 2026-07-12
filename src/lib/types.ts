@@ -27,8 +27,11 @@ export interface RepositoryState {
   files: FileStatus[];
   branches: Branch[];
   remotes: string[];
+  remoteBranches: string[];
+  tags: string[];
   worktrees: string[];
   stashes: StashEntry[];
+  userName?: string | null;
 }
 
 export interface CommitNode {
@@ -44,6 +47,25 @@ export interface CommitNode {
 
 export interface CommitGraph {
   commits: CommitNode[];
+}
+
+export interface CommitFileChange {
+  status: string;
+  path: string;
+}
+
+export interface CommitDetail {
+  hash: string;
+  shortHash: string;
+  parents: string[];
+  refs: string[];
+  author: string;
+  email: string;
+  date: string;
+  relativeDate: string;
+  subject: string;
+  body: string;
+  files: CommitFileChange[];
 }
 
 export interface GitAction {
