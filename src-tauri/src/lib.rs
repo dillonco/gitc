@@ -312,8 +312,12 @@ fn commit_file_diff(root: &Path, hash: &str, path: String) -> Result<FileDiff, S
 #[tauri::command]
 fn run_git_action(state: State<'_, AppState>, action: GitAction) -> Result<GitResult, String> {
     let root = active_repo(&state)?;
-    let args = action_args(&action)?;
-    Ok(run_git(&root, &args))
+    run_action(&root, &action)
+}
+
+fn run_action(root: &Path, action: &GitAction) -> Result<GitResult, String> {
+    let args = action_args(action)?;
+    Ok(run_git(root, &args))
 }
 
 #[tauri::command]
@@ -338,15 +342,19 @@ fn conflict_file(root: &Path, path: String) -> Result<ConflictFile, String> {
 #[tauri::command]
 fn get_file_diff(state: State<'_, AppState>, path: String, staged: bool) -> Result<FileDiff, String> {
     let root = active_repo(&state)?;
+    file_diff(&root, path, staged)
+}
+
+fn file_diff(root: &Path, path: String, staged: bool) -> Result<FileDiff, String> {
     validate_repo_relative_path(&path)?;
     let diff = if staged {
-        git_optional(&root, &["diff", "--cached", "--", &path])?.unwrap_or_default()
+        git_optional(root, &["diff", "--cached", "--", &path])?.unwrap_or_default()
     } else {
-        git_optional(&root, &["diff", "--", &path])?.unwrap_or_default()
+        git_optional(root, &["diff", "--", &path])?.unwrap_or_default()
     };
 
     let diff = if diff.is_empty() && !staged && root.join(&path).is_file() {
-        render_untracked_file_diff(&root, &path)?
+        render_untracked_file_diff(root, &path)?
     } else {
         diff
     };
@@ -362,9 +370,13 @@ fn get_file_diff(state: State<'_, AppState>, path: String, staged: bool) -> Resu
 #[tauri::command]
 fn get_file_content(state: State<'_, AppState>, path: String, staged: bool) -> Result<String, String> {
     let root = active_repo(&state)?;
+    file_content(&root, path, staged)
+}
+
+fn file_content(root: &Path, path: String, staged: bool) -> Result<String, String> {
     validate_repo_relative_path(&path)?;
     if staged {
-        git_optional(&root, &["show", &format!(":{path}")])
+        git_optional(root, &["show", &format!(":{path}")])
             .map(|content| content.unwrap_or_default())
     } else {
         fs::read_to_string(root.join(path)).map_err(|err| err.to_string())
@@ -374,22 +386,30 @@ fn get_file_content(state: State<'_, AppState>, path: String, staged: bool) -> R
 #[tauri::command]
 fn get_file_blame(state: State<'_, AppState>, path: String) -> Result<String, String> {
     let root = active_repo(&state)?;
-    validate_repo_relative_path(&path)?;
-    git(&root, &["blame", "--date=short", "--", &path])
+    file_blame(&root, &path)
+}
+
+fn file_blame(root: &Path, path: &str) -> Result<String, String> {
+    validate_repo_relative_path(path)?;
+    git(root, &["blame", "--date=short", "--", path])
 }
 
 #[tauri::command]
 fn get_file_history(state: State<'_, AppState>, path: String) -> Result<String, String> {
     let root = active_repo(&state)?;
-    validate_repo_relative_path(&path)?;
+    file_history(&root, &path)
+}
+
+fn file_history(root: &Path, path: &str) -> Result<String, String> {
+    validate_repo_relative_path(path)?;
     git(
-        &root,
+        root,
         &[
             "log",
             "--date=relative",
             "--format=%h  %ar  %an  %s",
             "--",
-            &path,
+            path,
         ],
     )
 }
@@ -397,13 +417,21 @@ fn get_file_history(state: State<'_, AppState>, path: String) -> Result<String, 
 #[tauri::command]
 fn apply_hunk(state: State<'_, AppState>, patch: String, mode: String) -> Result<GitResult, String> {
     let root = active_repo(&state)?;
-    let args: Vec<&str> = match mode.as_str() {
-        "stage" => vec!["apply", "--cached", "-"],
-        "unstage" => vec!["apply", "--cached", "--reverse", "-"],
-        "discard" => vec!["apply", "--reverse", "-"],
-        other => return Err(format!("unsupported hunk mode: {other}")),
-    };
-    Ok(run_git_with_stdin(&root, &args, &patch))
+    apply_hunk_patch(&root, &patch, &mode)
+}
+
+fn hunk_args(mode: &str) -> Result<Vec<&'static str>, String> {
+    match mode {
+        "stage" => Ok(vec!["apply", "--cached", "-"]),
+        "unstage" => Ok(vec!["apply", "--cached", "--reverse", "-"]),
+        "discard" => Ok(vec!["apply", "--reverse", "-"]),
+        other => Err(format!("unsupported hunk mode: {other}")),
+    }
+}
+
+fn apply_hunk_patch(root: &Path, patch: &str, mode: &str) -> Result<GitResult, String> {
+    let args = hunk_args(mode)?;
+    Ok(run_git_with_stdin(root, &args, patch))
 }
 
 #[tauri::command]
@@ -481,7 +509,9 @@ fn clone_repository(
     let target_arg = target
         .to_str()
         .ok_or_else(|| "clone target path is not valid UTF-8".to_string())?;
-    let result = run_git(parent, &["clone", &url, target_arg]);
+    // Separate options from operands so a URL beginning with `-` cannot be
+    // parsed as a git option (e.g. `--upload-pack=...`).
+    let result = run_git(parent, &["clone", "--", &url, target_arg]);
     if !result.ok {
         return Err(result.stderr);
     }
@@ -665,9 +695,9 @@ fn action_args(action: &GitAction) -> Result<Vec<&str>, String> {
     let message = action.message.as_deref();
 
     let args = match action.kind.as_str() {
-        "stage" => vec!["add", required(path, "path")?],
-        "unstage" => vec!["restore", "--staged", required(path, "path")?],
-        "discard" => vec!["restore", required(path, "path")?],
+        "stage" => vec!["add", "--", required(path, "path")?],
+        "unstage" => vec!["restore", "--staged", "--", required(path, "path")?],
+        "discard" => vec!["restore", "--", required(path, "path")?],
         "cleanUntracked" => vec!["clean", "-f", "--", required(path, "path")?],
         "commit" => vec!["commit", "-m", required(message, "message")?],
         "commitAmend" => vec!["commit", "--amend", "-m", required(message, "message")?],
@@ -713,7 +743,7 @@ fn action_args(action: &GitAction) -> Result<Vec<&str>, String> {
             reset_flag(action.mode.as_deref())?,
             required(target, "target")?,
         ],
-        "markResolved" => vec!["add", required(path, "path")?],
+        "markResolved" => vec!["add", "--", required(path, "path")?],
         unknown => return Err(format!("unknown git action: {unknown}")),
     };
 
@@ -1109,6 +1139,111 @@ u UU N... 100644 100644 100644 100644 a b c d conflicted.txt";
             vec!["commit", "--amend", "-m", "summary\n\ndescription"]
         );
     }
+
+    fn action(kind: &str) -> GitAction {
+        GitAction {
+            kind: kind.to_string(),
+            path: None,
+            message: None,
+            branch: None,
+            target: None,
+            remote: None,
+            mode: None,
+        }
+    }
+
+    #[test]
+    fn add_and_restore_actions_terminate_options_with_double_dash() {
+        // Regression: a file whose name begins with `-` must reach git as an
+        // operand, never as an option. Every add/restore path needs `--`.
+        let cases = [
+            ("stage", vec!["add", "--", "-rf"]),
+            ("unstage", vec!["restore", "--staged", "--", "-rf"]),
+            ("discard", vec!["restore", "--", "-rf"]),
+            ("markResolved", vec!["add", "--", "-rf"]),
+        ];
+        for (kind, expected) in cases {
+            let mut act = action(kind);
+            act.path = Some("-rf".to_string());
+            assert_eq!(action_args(&act).unwrap(), expected, "kind {kind}");
+        }
+    }
+
+    #[test]
+    fn clean_untracked_keeps_double_dash_separator() {
+        let mut act = action("cleanUntracked");
+        act.path = Some("junk.tmp".to_string());
+        assert_eq!(
+            action_args(&act).unwrap(),
+            vec!["clean", "-f", "--", "junk.tmp"]
+        );
+    }
+
+    #[test]
+    fn push_and_pull_default_to_origin_and_reject_bad_remotes() {
+        let mut push = action("push");
+        assert_eq!(action_args(&push).unwrap(), vec!["push", "-u", "origin", "HEAD"]);
+        push.remote = Some("upstream".to_string());
+        assert_eq!(
+            action_args(&push).unwrap(),
+            vec!["push", "-u", "upstream", "HEAD"]
+        );
+        push.remote = Some("--exec=evil".to_string());
+        assert!(action_args(&push).is_err(), "option-like remote must be rejected");
+
+        let force = action("forcePush");
+        assert_eq!(
+            action_args(&force).unwrap(),
+            vec!["push", "--force-with-lease", "origin", "HEAD"]
+        );
+
+        let pull = action("pull");
+        assert_eq!(action_args(&pull).unwrap(), vec!["pull", "--ff-only", "origin"]);
+    }
+
+    #[test]
+    fn stash_actions_require_their_target() {
+        for kind in ["stashApply", "stashPop", "stashDrop"] {
+            assert!(action_args(&action(kind)).is_err(), "kind {kind} needs a target");
+        }
+        let mut apply = action("stashApply");
+        apply.target = Some("stash@{0}".to_string());
+        assert_eq!(action_args(&apply).unwrap(), vec!["stash", "apply", "stash@{0}"]);
+    }
+
+    #[test]
+    fn reset_rejects_unknown_mode() {
+        let mut act = action("reset");
+        act.target = Some("HEAD".to_string());
+        act.mode = Some("nuclear".to_string());
+        assert!(action_args(&act).is_err());
+    }
+
+    #[test]
+    fn unknown_action_kind_is_rejected() {
+        assert!(action_args(&action("rm -rf /")).is_err());
+    }
+
+    #[test]
+    fn required_arguments_are_enforced() {
+        // commit without a message, branch ops without a branch, etc.
+        assert!(action_args(&action("commit")).is_err());
+        assert!(action_args(&action("checkoutBranch")).is_err());
+        assert!(action_args(&action("createTag")).is_err());
+        assert!(action_args(&action("merge")).is_err());
+        // whitespace-only values count as missing
+        let mut blank = action("checkoutBranch");
+        blank.branch = Some("   ".to_string());
+        assert!(action_args(&blank).is_err());
+    }
+
+    #[test]
+    fn validate_repo_relative_path_blocks_traversal_variants() {
+        assert!(validate_repo_relative_path("a/../../etc/passwd").is_err());
+        assert!(validate_repo_relative_path("./../secret").is_err());
+        assert!(validate_repo_relative_path("nested/ok/path.rs").is_ok());
+        assert!(validate_repo_relative_path("").is_ok());
+    }
 }
 
 // End-to-end tests that drive the real git CLI in throwaway repositories.
@@ -1342,5 +1477,649 @@ mod git_integration_tests {
         assert!(diff.contains("+hello"));
         assert!(diff.contains("+world"));
         assert!(!diff.contains("\\ No newline at end of file"));
+    }
+
+    // ---- helpers for driving the real action dispatcher ----
+
+    fn act(kind: &str) -> GitAction {
+        GitAction {
+            kind: kind.to_string(),
+            path: None,
+            message: None,
+            branch: None,
+            target: None,
+            remote: None,
+            mode: None,
+        }
+    }
+
+    fn ok_action(root: &Path, action: &GitAction) -> GitResult {
+        let result = run_action(root, action).expect("action_args must succeed");
+        assert!(
+            result.ok,
+            "action {:?} failed: {}",
+            action.kind, result.stderr
+        );
+        result
+    }
+
+    fn head_subject(root: &Path) -> String {
+        git(root, &["log", "-1", "--format=%s"]).unwrap()
+    }
+
+    // ---- success paths for the action dispatcher ----
+
+    #[test]
+    fn stage_then_commit_advances_head_and_cleans_tree() {
+        let repo = TempRepo::new();
+        write_file(repo.path(), "a.txt", "one\n");
+        commit_all(repo.path(), "init");
+
+        write_file(repo.path(), "b.txt", "content\n");
+        let mut stage = act("stage");
+        stage.path = Some("b.txt".to_string());
+        ok_action(repo.path(), &stage);
+        assert!(repository_state(repo.path())
+            .unwrap()
+            .files
+            .iter()
+            .any(|f| f.path == "b.txt" && f.group == FileGroup::Staged));
+
+        let mut commit = act("commit");
+        commit.message = Some("add b".to_string());
+        ok_action(repo.path(), &commit);
+
+        assert_eq!(head_subject(repo.path()), "add b");
+        assert!(repository_state(repo.path()).unwrap().files.is_empty());
+    }
+
+    #[test]
+    fn unstage_and_discard_return_file_to_pristine_state() {
+        let repo = TempRepo::new();
+        write_file(repo.path(), "a.txt", "one\n");
+        commit_all(repo.path(), "init");
+
+        write_file(repo.path(), "a.txt", "two\n");
+        run(repo.path(), &["add", "a.txt"]);
+
+        let mut unstage = act("unstage");
+        unstage.path = Some("a.txt".to_string());
+        ok_action(repo.path(), &unstage);
+        assert!(repository_state(repo.path())
+            .unwrap()
+            .files
+            .iter()
+            .all(|f| f.group != FileGroup::Staged));
+
+        let mut discard = act("discard");
+        discard.path = Some("a.txt".to_string());
+        ok_action(repo.path(), &discard);
+        assert!(repository_state(repo.path()).unwrap().files.is_empty());
+        assert_eq!(fs::read_to_string(repo.path().join("a.txt")).unwrap(), "one\n");
+    }
+
+    #[test]
+    fn clean_untracked_removes_the_file() {
+        let repo = TempRepo::new();
+        write_file(repo.path(), "a.txt", "one\n");
+        commit_all(repo.path(), "init");
+        write_file(repo.path(), "junk.tmp", "garbage\n");
+
+        let mut clean = act("cleanUntracked");
+        clean.path = Some("junk.tmp".to_string());
+        ok_action(repo.path(), &clean);
+        assert!(!repo.path().join("junk.tmp").exists());
+    }
+
+    #[test]
+    fn amend_rewrites_the_head_commit_message() {
+        let repo = TempRepo::new();
+        write_file(repo.path(), "a.txt", "one\n");
+        commit_all(repo.path(), "typo");
+
+        let mut amend = act("commitAmend");
+        amend.message = Some("fixed message".to_string());
+        ok_action(repo.path(), &amend);
+        assert_eq!(head_subject(repo.path()), "fixed message");
+    }
+
+    #[test]
+    fn branch_lifecycle_create_checkout_and_delete() {
+        let repo = TempRepo::new();
+        write_file(repo.path(), "a.txt", "one\n");
+        commit_all(repo.path(), "init");
+
+        let mut create = act("createBranch");
+        create.branch = Some("feature".to_string());
+        ok_action(repo.path(), &create);
+        assert_eq!(
+            repository_state(repo.path()).unwrap().current_branch.as_deref(),
+            Some("feature")
+        );
+
+        let mut checkout = act("checkoutBranch");
+        checkout.branch = Some("main".to_string());
+        ok_action(repo.path(), &checkout);
+
+        let mut delete = act("deleteBranch");
+        delete.branch = Some("feature".to_string());
+        ok_action(repo.path(), &delete);
+        assert!(repository_state(repo.path())
+            .unwrap()
+            .branches
+            .iter()
+            .all(|b| b.name != "feature"));
+    }
+
+    #[test]
+    fn tag_create_and_delete_round_trip() {
+        let repo = TempRepo::new();
+        write_file(repo.path(), "a.txt", "one\n");
+        commit_all(repo.path(), "init");
+
+        let mut create = act("createTag");
+        create.branch = Some("v1.0.0".to_string());
+        ok_action(repo.path(), &create);
+        assert_eq!(repository_state(repo.path()).unwrap().tags, vec!["v1.0.0"]);
+
+        let mut delete = act("deleteTag");
+        delete.branch = Some("v1.0.0".to_string());
+        ok_action(repo.path(), &delete);
+        assert!(repository_state(repo.path()).unwrap().tags.is_empty());
+    }
+
+    #[test]
+    fn stash_create_apply_and_drop_round_trip() {
+        let repo = TempRepo::new();
+        write_file(repo.path(), "a.txt", "one\n");
+        commit_all(repo.path(), "init");
+        write_file(repo.path(), "a.txt", "dirty\n");
+
+        let mut create = act("stashCreate");
+        create.message = Some("wip".to_string());
+        ok_action(repo.path(), &create);
+        assert!(repository_state(repo.path()).unwrap().files.is_empty());
+        assert_eq!(repository_state(repo.path()).unwrap().stashes.len(), 1);
+
+        let mut apply = act("stashApply");
+        apply.target = Some("stash@{0}".to_string());
+        ok_action(repo.path(), &apply);
+        assert_eq!(fs::read_to_string(repo.path().join("a.txt")).unwrap(), "dirty\n");
+
+        let mut drop = act("stashDrop");
+        drop.target = Some("stash@{0}".to_string());
+        ok_action(repo.path(), &drop);
+        assert!(repository_state(repo.path()).unwrap().stashes.is_empty());
+    }
+
+    #[test]
+    fn cherry_pick_and_revert_apply_and_undo_a_change() {
+        let repo = TempRepo::new();
+        write_file(repo.path(), "a.txt", "base\n");
+        commit_all(repo.path(), "base");
+        run(repo.path(), &["checkout", "-b", "feature"]);
+        write_file(repo.path(), "feature.txt", "feature\n");
+        commit_all(repo.path(), "feature commit");
+        let feature_hash = git(repo.path(), &["rev-parse", "HEAD"]).unwrap();
+        run(repo.path(), &["checkout", "main"]);
+
+        let mut pick = act("cherryPick");
+        pick.target = Some(feature_hash);
+        ok_action(repo.path(), &pick);
+        assert!(repo.path().join("feature.txt").exists());
+
+        let head = git(repo.path(), &["rev-parse", "HEAD"]).unwrap();
+        let mut revert = act("revert");
+        revert.target = Some(head);
+        ok_action(repo.path(), &revert);
+        assert!(!repo.path().join("feature.txt").exists());
+    }
+
+    #[test]
+    fn reset_modes_move_head_and_control_the_index() {
+        let repo = TempRepo::new();
+        write_file(repo.path(), "a.txt", "one\n");
+        commit_all(repo.path(), "first");
+        write_file(repo.path(), "a.txt", "two\n");
+        commit_all(repo.path(), "second");
+
+        // soft: HEAD moves back, change stays staged.
+        let mut soft = act("reset");
+        soft.target = Some("HEAD~1".to_string());
+        soft.mode = Some("soft".to_string());
+        ok_action(repo.path(), &soft);
+        assert_eq!(head_subject(repo.path()), "first");
+        assert!(repository_state(repo.path())
+            .unwrap()
+            .files
+            .iter()
+            .any(|f| f.group == FileGroup::Staged));
+
+        // hard: index and worktree return to HEAD.
+        let mut hard = act("reset");
+        hard.target = Some("HEAD".to_string());
+        hard.mode = Some("hard".to_string());
+        ok_action(repo.path(), &hard);
+        assert!(repository_state(repo.path()).unwrap().files.is_empty());
+    }
+
+    #[test]
+    fn merge_fast_forward_advances_head() {
+        let repo = TempRepo::new();
+        write_file(repo.path(), "a.txt", "one\n");
+        commit_all(repo.path(), "base");
+        run(repo.path(), &["checkout", "-b", "feature"]);
+        write_file(repo.path(), "b.txt", "two\n");
+        commit_all(repo.path(), "feature work");
+        run(repo.path(), &["checkout", "main"]);
+
+        let mut merge = act("merge");
+        merge.target = Some("feature".to_string());
+        ok_action(repo.path(), &merge);
+        assert_eq!(head_subject(repo.path()), "feature work");
+    }
+
+    #[test]
+    fn rebase_replays_commits_onto_target() {
+        let repo = TempRepo::new();
+        write_file(repo.path(), "a.txt", "one\n");
+        commit_all(repo.path(), "base");
+        run(repo.path(), &["checkout", "-b", "feature"]);
+        write_file(repo.path(), "feature.txt", "f\n");
+        commit_all(repo.path(), "feature work");
+        run(repo.path(), &["checkout", "main"]);
+        write_file(repo.path(), "main.txt", "m\n");
+        commit_all(repo.path(), "main work");
+        run(repo.path(), &["checkout", "feature"]);
+
+        let mut rebase = act("rebase");
+        rebase.target = Some("main".to_string());
+        ok_action(repo.path(), &rebase);
+        // feature now sits on top of main work.
+        let parents = git(repo.path(), &["log", "--format=%s"]).unwrap();
+        assert!(parents.contains("main work"));
+        assert_eq!(head_subject(repo.path()), "feature work");
+    }
+
+    #[test]
+    fn checkout_remote_tracks_and_checkout_commit_detaches() {
+        // Build an "origin" by cloning so a remote-tracking branch exists.
+        let origin = TempRepo::new();
+        write_file(origin.path(), "a.txt", "one\n");
+        commit_all(origin.path(), "init");
+        run(origin.path(), &["checkout", "-b", "released"]);
+        write_file(origin.path(), "b.txt", "two\n");
+        commit_all(origin.path(), "release work");
+        run(origin.path(), &["checkout", "main"]);
+
+        let clone_dir =
+            std::env::temp_dir().join(format!("gitc-clone-{}", std::process::id()));
+        fs::remove_dir_all(&clone_dir).ok();
+        run(
+            std::env::temp_dir().as_path(),
+            &[
+                "clone",
+                origin.path().to_str().unwrap(),
+                clone_dir.to_str().unwrap(),
+            ],
+        );
+
+        let mut track = act("checkoutRemote");
+        track.target = Some("origin/released".to_string());
+        ok_action(&clone_dir, &track);
+        assert_eq!(
+            repository_state(&clone_dir).unwrap().current_branch.as_deref(),
+            Some("released")
+        );
+
+        let head = git(&clone_dir, &["rev-parse", "HEAD"]).unwrap();
+        let mut detach = act("checkoutCommit");
+        detach.target = Some(head);
+        ok_action(&clone_dir, &detach);
+        assert!(repository_state(&clone_dir).unwrap().current_branch.is_none());
+
+        fs::remove_dir_all(&clone_dir).ok();
+    }
+
+    // ---- hunk staging, file content, blame, history, conflict save ----
+
+    #[test]
+    fn apply_hunk_stages_then_unstages_a_patch() {
+        let repo = TempRepo::new();
+        write_file(repo.path(), "a.txt", "one\ntwo\nthree\n");
+        commit_all(repo.path(), "init");
+        write_file(repo.path(), "a.txt", "one\nCHANGED\nthree\n");
+
+        let patch = git(repo.path(), &["diff", "--", "a.txt"]).unwrap() + "\n";
+
+        let staged = apply_hunk_patch(repo.path(), &patch, "stage").unwrap();
+        assert!(staged.ok, "stage failed: {}", staged.stderr);
+        assert!(repository_state(repo.path())
+            .unwrap()
+            .files
+            .iter()
+            .any(|f| f.group == FileGroup::Staged));
+
+        let staged_patch = git(repo.path(), &["diff", "--cached", "--", "a.txt"]).unwrap() + "\n";
+        let unstaged = apply_hunk_patch(repo.path(), &staged_patch, "unstage").unwrap();
+        assert!(unstaged.ok, "unstage failed: {}", unstaged.stderr);
+        assert!(repository_state(repo.path())
+            .unwrap()
+            .files
+            .iter()
+            .all(|f| f.group != FileGroup::Staged));
+    }
+
+    #[test]
+    fn apply_hunk_rejects_unknown_mode() {
+        assert!(hunk_args("frobnicate").is_err());
+    }
+
+    #[test]
+    fn file_content_reads_staged_and_working_versions() {
+        let repo = TempRepo::new();
+        write_file(repo.path(), "a.txt", "committed\n");
+        commit_all(repo.path(), "init");
+        write_file(repo.path(), "a.txt", "working\n");
+
+        assert_eq!(
+            file_content(repo.path(), "a.txt".to_string(), true).unwrap(),
+            "committed"
+        );
+        assert_eq!(
+            file_content(repo.path(), "a.txt".to_string(), false).unwrap(),
+            "working\n"
+        );
+    }
+
+    #[test]
+    fn blame_and_history_report_the_authoring_commit() {
+        let repo = TempRepo::new();
+        write_file(repo.path(), "a.txt", "line\n");
+        commit_all(repo.path(), "first change");
+        write_file(repo.path(), "a.txt", "line\nmore\n");
+        commit_all(repo.path(), "second change");
+
+        let blame = file_blame(repo.path(), "a.txt").unwrap();
+        assert!(blame.contains("Test User"));
+        assert!(blame.contains("line"));
+
+        let history = file_history(repo.path(), "a.txt").unwrap();
+        assert!(history.contains("first change"));
+        assert!(history.contains("second change"));
+    }
+
+    #[test]
+    fn file_diff_shows_staged_and_untracked_changes() {
+        let repo = TempRepo::new();
+        write_file(repo.path(), "a.txt", "one\n");
+        commit_all(repo.path(), "init");
+
+        // Untracked file: synthetic new-file patch on the unstaged side.
+        write_file(repo.path(), "new.txt", "fresh\n");
+        let untracked = file_diff(repo.path(), "new.txt".to_string(), false).unwrap();
+        assert!(untracked.diff.contains("+fresh"));
+        assert!(!untracked.binary);
+
+        // Staged edit shows on the staged side.
+        write_file(repo.path(), "a.txt", "two\n");
+        run(repo.path(), &["add", "a.txt"]);
+        let staged = file_diff(repo.path(), "a.txt".to_string(), true).unwrap();
+        assert!(staged.diff.contains("+two"));
+    }
+
+    #[test]
+    fn save_conflict_resolution_writes_working_file() {
+        let repo = TempRepo::new();
+        write_file(repo.path(), "a.txt", "one\n");
+        commit_all(repo.path(), "init");
+
+        conflict_write(repo.path(), "a.txt", "resolved contents\n");
+        assert_eq!(
+            fs::read_to_string(repo.path().join("a.txt")).unwrap(),
+            "resolved contents\n"
+        );
+    }
+
+    // Mirror of save_conflict_resolution's core without the Tauri State.
+    fn conflict_write(root: &Path, path: &str, content: &str) {
+        validate_repo_relative_path(path).unwrap();
+        fs::write(root.join(path), content).unwrap();
+    }
+
+    // ---- repository discovery, creation, cloning ----
+
+    #[test]
+    fn discover_repo_root_finds_toplevel_from_subdirectory() {
+        let repo = TempRepo::new();
+        write_file(repo.path(), "a.txt", "one\n");
+        commit_all(repo.path(), "init");
+        fs::create_dir_all(repo.path().join("nested/deep")).unwrap();
+
+        let found = discover_repo_root(&repo.path().join("nested/deep")).unwrap();
+        // Compare canonicalized paths (temp dirs may be symlinked, e.g. /var vs /private/var).
+        assert_eq!(
+            fs::canonicalize(&found).unwrap(),
+            fs::canonicalize(repo.path()).unwrap()
+        );
+    }
+
+    #[test]
+    fn discover_repo_root_errors_outside_any_repository() {
+        let dir = std::env::temp_dir().join(format!("gitc-notrepo-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        assert!(discover_repo_root(&dir).is_err());
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn clone_from_a_local_source_reproduces_history() {
+        let origin = TempRepo::new();
+        write_file(origin.path(), "a.txt", "one\n");
+        commit_all(origin.path(), "seed");
+
+        let target = std::env::temp_dir().join(format!("gitc-clonetgt-{}", std::process::id()));
+        fs::remove_dir_all(&target).ok();
+        let parent = target.parent().unwrap();
+        let result = run_git(
+            parent,
+            &["clone", "--", origin.path().to_str().unwrap(), target.to_str().unwrap()],
+        );
+        assert!(result.ok, "clone failed: {}", result.stderr);
+
+        let state = repository_state(&target).unwrap();
+        assert!(state.remotes.iter().any(|r| r == "origin"));
+        assert_eq!(head_subject(&target), "seed");
+        fs::remove_dir_all(&target).ok();
+    }
+
+    // ---- failure paths: "what happens if they fail" ----
+
+    #[test]
+    fn commit_with_nothing_staged_fails_cleanly() {
+        let repo = TempRepo::new();
+        write_file(repo.path(), "a.txt", "one\n");
+        commit_all(repo.path(), "init");
+
+        let mut commit = act("commit");
+        commit.message = Some("empty".to_string());
+        let result = run_action(repo.path(), &commit).unwrap();
+        assert!(!result.ok, "expected failure with a clean tree");
+        assert!(!result.stdout.is_empty() || !result.stderr.is_empty());
+        // A failed action still asks the UI to refresh so state stays accurate.
+        assert!(result.refresh);
+    }
+
+    #[test]
+    fn deleting_an_unmerged_branch_fails_until_forced() {
+        let repo = TempRepo::new();
+        write_file(repo.path(), "a.txt", "one\n");
+        commit_all(repo.path(), "init");
+        run(repo.path(), &["checkout", "-b", "feature"]);
+        write_file(repo.path(), "b.txt", "two\n");
+        commit_all(repo.path(), "unmerged work");
+        run(repo.path(), &["checkout", "main"]);
+
+        let mut delete = act("deleteBranch");
+        delete.branch = Some("feature".to_string());
+        let safe = run_action(repo.path(), &delete).unwrap();
+        assert!(!safe.ok, "unmerged branch must not delete with -d");
+        assert!(repository_state(repo.path())
+            .unwrap()
+            .branches
+            .iter()
+            .any(|b| b.name == "feature"));
+
+        let mut force = act("deleteBranchForce");
+        force.branch = Some("feature".to_string());
+        ok_action(repo.path(), &force);
+        assert!(repository_state(repo.path())
+            .unwrap()
+            .branches
+            .iter()
+            .all(|b| b.name != "feature"));
+    }
+
+    #[test]
+    fn checking_out_a_missing_branch_reports_an_error() {
+        let repo = TempRepo::new();
+        write_file(repo.path(), "a.txt", "one\n");
+        commit_all(repo.path(), "init");
+
+        let mut checkout = act("checkoutBranch");
+        checkout.branch = Some("does-not-exist".to_string());
+        let result = run_action(repo.path(), &checkout).unwrap();
+        assert!(!result.ok);
+        assert!(result.stderr.to_lowercase().contains("did not match")
+            || result.stderr.to_lowercase().contains("invalid reference")
+            || !result.stderr.is_empty());
+    }
+
+    #[test]
+    fn fast_forward_pull_fails_when_histories_diverge() {
+        let origin = TempRepo::new();
+        write_file(origin.path(), "a.txt", "one\n");
+        commit_all(origin.path(), "seed");
+
+        let clone_dir = std::env::temp_dir().join(format!("gitc-pull-{}", std::process::id()));
+        fs::remove_dir_all(&clone_dir).ok();
+        run(
+            std::env::temp_dir().as_path(),
+            &["clone", origin.path().to_str().unwrap(), clone_dir.to_str().unwrap()],
+        );
+
+        // Diverge: origin gets a commit, clone gets a different one.
+        write_file(origin.path(), "a.txt", "origin change\n");
+        commit_all(origin.path(), "origin work");
+        write_file(&clone_dir, "a.txt", "local change\n");
+        commit_all(&clone_dir, "local work");
+
+        let pull = act("pull");
+        let result = run_action(&clone_dir, &pull).unwrap();
+        assert!(!result.ok, "ff-only pull must refuse to merge divergent history");
+
+        fs::remove_dir_all(&clone_dir).ok();
+    }
+
+    #[test]
+    fn conflicting_merge_can_be_aborted() {
+        let repo = TempRepo::new();
+        write_file(repo.path(), "file.txt", "base\n");
+        commit_all(repo.path(), "base");
+        run(repo.path(), &["checkout", "-b", "feature"]);
+        write_file(repo.path(), "file.txt", "theirs\n");
+        commit_all(repo.path(), "theirs");
+        run(repo.path(), &["checkout", "main"]);
+        write_file(repo.path(), "file.txt", "ours\n");
+        commit_all(repo.path(), "ours");
+
+        let mut merge = act("merge");
+        merge.target = Some("feature".to_string());
+        let result = run_action(repo.path(), &merge).unwrap();
+        assert!(!result.ok, "merge should conflict");
+        assert!(repository_state(repo.path()).unwrap().merging);
+
+        let abort = act("mergeAbort");
+        ok_action(repo.path(), &abort);
+        assert!(!repository_state(repo.path()).unwrap().merging);
+        assert_eq!(fs::read_to_string(repo.path().join("file.txt")).unwrap(), "ours\n");
+    }
+
+    #[test]
+    fn conflicting_merge_can_be_resolved_and_continued() {
+        let repo = TempRepo::new();
+        write_file(repo.path(), "file.txt", "base\n");
+        commit_all(repo.path(), "base");
+        run(repo.path(), &["checkout", "-b", "feature"]);
+        write_file(repo.path(), "file.txt", "theirs\n");
+        commit_all(repo.path(), "theirs");
+        run(repo.path(), &["checkout", "main"]);
+        write_file(repo.path(), "file.txt", "ours\n");
+        commit_all(repo.path(), "ours");
+
+        let mut merge = act("merge");
+        merge.target = Some("feature".to_string());
+        assert!(!run_action(repo.path(), &merge).unwrap().ok);
+
+        // Resolve via markResolved, then continue.
+        fs::write(repo.path().join("file.txt"), "resolved\n").unwrap();
+        let mut resolved = act("markResolved");
+        resolved.path = Some("file.txt".to_string());
+        ok_action(repo.path(), &resolved);
+
+        let cont = act("mergeContinue");
+        let result = run_action(repo.path(), &cont).unwrap();
+        assert!(result.ok, "merge --continue failed: {}", result.stderr);
+        assert!(!repository_state(repo.path()).unwrap().merging);
+        assert_eq!(repository_state(repo.path()).unwrap().head.len() >= 4, true);
+    }
+
+    #[test]
+    fn applying_a_corrupt_hunk_fails_without_touching_the_index() {
+        let repo = TempRepo::new();
+        write_file(repo.path(), "a.txt", "one\n");
+        commit_all(repo.path(), "init");
+
+        let bogus = "diff --git a/a.txt b/a.txt\n@@ -99,3 +99,3 @@\n-nonexistent\n+garbage\n";
+        let result = apply_hunk_patch(repo.path(), bogus, "stage").unwrap();
+        assert!(!result.ok, "corrupt patch must not apply");
+        assert!(repository_state(repo.path()).unwrap().files.is_empty());
+    }
+
+    #[test]
+    fn actions_reject_option_injection_and_traversal_before_running() {
+        let repo = TempRepo::new();
+        write_file(repo.path(), "a.txt", "one\n");
+        commit_all(repo.path(), "init");
+
+        // Ref argument that looks like an option is rejected up front.
+        let mut evil_branch = act("checkoutBranch");
+        evil_branch.branch = Some("--orphan".to_string());
+        assert!(run_action(repo.path(), &evil_branch).is_err());
+
+        // Path escaping the repo is rejected up front.
+        let mut evil_path = act("stage");
+        evil_path.path = Some("../outside.txt".to_string());
+        assert!(run_action(repo.path(), &evil_path).is_err());
+    }
+
+    #[test]
+    fn a_file_named_like_an_option_is_staged_as_a_path() {
+        // Regression for the `--` separator fix: a real file called `-a.txt`
+        // must be added as a pathspec, not interpreted as `git add -a`.
+        let repo = TempRepo::new();
+        write_file(repo.path(), "keep.txt", "keep\n");
+        commit_all(repo.path(), "init");
+        write_file(repo.path(), "-a.txt", "tricky\n");
+
+        let mut stage = act("stage");
+        stage.path = Some("-a.txt".to_string());
+        let result = run_action(repo.path(), &stage).unwrap();
+        assert!(result.ok, "staging a dash-named file failed: {}", result.stderr);
+        assert!(repository_state(repo.path())
+            .unwrap()
+            .files
+            .iter()
+            .any(|f| f.path == "-a.txt" && f.group == FileGroup::Staged));
     }
 }
