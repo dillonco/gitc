@@ -129,6 +129,14 @@
   let busy = false;
   let error = "";
   let notice = "";
+  let noticeTimer: ReturnType<typeof setTimeout> | null = null;
+  let filterInput: HTMLInputElement | null = null;
+
+  // Success toasts dismiss themselves; errors stay until addressed.
+  $: if (notice) {
+    if (noticeTimer) clearTimeout(noticeTimer);
+    noticeTimer = setTimeout(() => (notice = ""), 3200);
+  }
 
   const riskyActions = new Set([
     "discard",
@@ -850,6 +858,16 @@
       settingsOpen = false;
       actionsOpen = false;
     }
+    if ((event.metaKey || event.ctrlKey) && event.altKey && event.code === "KeyF") {
+      event.preventDefault();
+      filterInput?.focus();
+      filterInput?.select();
+    }
+  }}
+  on:click={(event) => {
+    if (actionsOpen && !(event.target instanceof Element && event.target.closest(".search-actions"))) {
+      actionsOpen = false;
+    }
   }}
 />
 
@@ -925,7 +943,12 @@
         <span class="panel-count">{(state?.branches.length ?? 0) + (state?.remoteBranches.length ?? 0)} refs</span>
       </div>
       <div class="filter-block">
-        <input aria-label="Filter refs" bind:value={searchQuery} placeholder="Filter refs (⌘ + Option + F)" />
+        <input
+          aria-label="Filter refs"
+          bind:this={filterInput}
+          bind:value={searchQuery}
+          placeholder="Filter refs (⌘ + Option + F)"
+        />
       </div>
 
       <div class="nav-scroll">
@@ -1098,8 +1121,19 @@
   {/if}
 
   <section class="graph-area">
-    {#if error}<div class="message error">{error}</div>{/if}
-    {#if notice}<div class="message ok">{notice}</div>{/if}
+    {#if busy}<div class="busy-bar" aria-hidden="true"></div>{/if}
+    {#if error}
+      <div class="message error" role="alert">
+        <span>{error}</span>
+        <button class="msg-close" title="Dismiss" on:click={() => (error = "")}>×</button>
+      </div>
+    {/if}
+    {#if notice}
+      <div class="message ok" role="status">
+        <span>{notice}</span>
+        <button class="msg-close" title="Dismiss" on:click={() => (notice = "")}>×</button>
+      </div>
+    {/if}
     {#if state?.merging || state?.rebasing}
       <div class="message conflict-banner">
         <span>
