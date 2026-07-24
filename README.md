@@ -13,7 +13,10 @@ provides a dense desktop workflow:
 - Staging workflow with path and tree views, hunk staging/unstaging/discard, and
   unified or side-by-side diffs, plus file view, blame, and history.
 - Branches (checkout, create, delete), remote branches (checkout tracking), tags
-  (create, checkout, delete), stashes (create, apply, pop, drop), and worktrees.
+  (create, checkout, delete), and stashes (create, apply, pop, drop).
+- Worktrees as first-class sidebar entries: one-click switching between checkouts,
+  add (existing, new, or detached branch), remove with a force fallback, and prune
+  for stale entries — with branch, path, locked, and stale state on every row.
 - Merge/rebase progress banner with continue/abort, and an explicit-save merge editor
   for conflicts (base/ours/theirs/resolved).
 - Fetch, pull (ff-only), push, force-push with lease, and an actions menu; settings for

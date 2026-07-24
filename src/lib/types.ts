@@ -18,6 +18,19 @@ export interface StashEntry {
   message: string;
 }
 
+export interface Worktree {
+  path: string;
+  head: string;
+  branch?: string | null;
+  detached: boolean;
+  bare: boolean;
+  current: boolean;
+  main: boolean;
+  locked: boolean;
+  lockReason?: string | null;
+  prunable: boolean;
+}
+
 export interface RepositoryState {
   root: string;
   currentBranch?: string | null;
@@ -29,7 +42,7 @@ export interface RepositoryState {
   remotes: string[];
   remoteBranches: string[];
   tags: string[];
-  worktrees: string[];
+  worktrees: Worktree[];
   stashes: StashEntry[];
   userName?: string | null;
 }

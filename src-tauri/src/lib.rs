@@ -45,6 +45,21 @@ pub struct StashEntry {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct Worktree {
+    path: String,
+    head: String,
+    branch: Option<String>,
+    detached: bool,
+    bare: bool,
+    current: bool,
+    main: bool,
+    locked: bool,
+    lock_reason: Option<String>,
+    prunable: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RepositoryState {
     root: String,
     current_branch: Option<String>,
@@ -56,7 +71,7 @@ pub struct RepositoryState {
     remotes: Vec<String>,
     remote_branches: Vec<String>,
     tags: Vec<String>,
-    worktrees: Vec<String>,
+    worktrees: Vec<Worktree>,
     stashes: Vec<StashEntry>,
     user_name: Option<String>,
 }
@@ -187,7 +202,7 @@ fn repository_state(root: &Path) -> Result<RepositoryState, String> {
             .filter(|line| !line.is_empty())
             .map(ToOwned::to_owned)
             .collect(),
-        worktrees: parse_worktrees(&git(&root, &["worktree", "list", "--porcelain"])?),
+        worktrees: parse_worktrees(&git(&root, &["worktree", "list", "--porcelain"])?, root),
         stashes: parse_stashes(&git(&root, &["stash", "list"])?),
         user_name: git_optional(&root, &["config", "user.name"])?,
     })
@@ -316,8 +331,21 @@ fn run_git_action(state: State<'_, AppState>, action: GitAction) -> Result<GitRe
 }
 
 fn run_action(root: &Path, action: &GitAction) -> Result<GitResult, String> {
+    if matches!(action.kind.as_str(), "worktreeRemove" | "worktreeRemoveForce") {
+        let target = Path::new(action.path.as_deref().unwrap_or_default());
+        if canonical_or_self(root) == canonical_or_self(target) {
+            return Err(
+                "cannot remove the worktree that is currently open; switch to another worktree first"
+                    .to_string(),
+            );
+        }
+    }
     let args = action_args(action)?;
     Ok(run_git(root, &args))
+}
+
+fn canonical_or_self(path: &Path) -> PathBuf {
+    path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
 }
 
 #[tauri::command]
@@ -744,11 +772,56 @@ fn action_args(action: &GitAction) -> Result<Vec<&str>, String> {
             required(target, "target")?,
         ],
         "markResolved" => vec!["add", "--", required(path, "path")?],
+        "worktreeAdd" => match action.mode.as_deref().unwrap_or("checkout") {
+            // Check out an existing branch into a new worktree directory.
+            "checkout" => vec![
+                "worktree",
+                "add",
+                required(path, "path")?,
+                required(branch, "branch")?,
+            ],
+            // Create a new branch (optionally from a base ref) in the new worktree.
+            "new" => {
+                let mut args = vec![
+                    "worktree",
+                    "add",
+                    "-b",
+                    required(branch, "branch")?,
+                    required(path, "path")?,
+                ];
+                if let Some(target) = target.filter(|value| !value.trim().is_empty()) {
+                    args.push(target);
+                }
+                args
+            }
+            "detach" => vec![
+                "worktree",
+                "add",
+                "--detach",
+                required(path, "path")?,
+                required(target, "target")?,
+            ],
+            other => return Err(format!("unsupported worktree add mode: {other}")),
+        },
+        "worktreeRemove" => vec!["worktree", "remove", required(path, "path")?],
+        "worktreeRemoveForce" => {
+            vec!["worktree", "remove", "--force", required(path, "path")?]
+        }
+        "worktreePrune" => vec!["worktree", "prune", "-v"],
         unknown => return Err(format!("unknown git action: {unknown}")),
     };
 
     if let Some(path) = path {
-        validate_repo_relative_path(path)?;
+        // Worktree directories live outside the repository, so they get their
+        // own validation instead of the repo-relative check.
+        if matches!(
+            action.kind.as_str(),
+            "worktreeAdd" | "worktreeRemove" | "worktreeRemoveForce"
+        ) {
+            validate_worktree_path(path)?;
+        } else {
+            validate_repo_relative_path(path)?;
+        }
     }
     for value in [branch, target, action.remote.as_deref()].into_iter().flatten() {
         validate_ref_arg(value)?;
@@ -798,6 +871,17 @@ fn parse_name_status(out: &str) -> Vec<CommitFileChange> {
             })
         })
         .collect()
+}
+
+fn validate_worktree_path(path: &str) -> Result<(), String> {
+    let trimmed = path.trim();
+    if trimmed.is_empty() || trimmed.starts_with('-') {
+        return Err(format!("invalid worktree path: {path:?}"));
+    }
+    if !Path::new(trimmed).is_absolute() {
+        return Err("worktree path must be absolute".to_string());
+    }
+    Ok(())
 }
 
 fn validate_repo_relative_path(path: &str) -> Result<(), String> {
@@ -927,10 +1011,62 @@ fn parse_stashes(out: &str) -> Vec<StashEntry> {
         .collect()
 }
 
-fn parse_worktrees(out: &str) -> Vec<String> {
-    out.lines()
-        .filter_map(|line| line.strip_prefix("worktree "))
-        .map(ToOwned::to_owned)
+fn parse_worktrees(out: &str, current_root: &Path) -> Vec<Worktree> {
+    let current = current_root
+        .canonicalize()
+        .unwrap_or_else(|_| current_root.to_path_buf());
+
+    out.split("\n\n")
+        .filter(|block| !block.trim().is_empty())
+        .enumerate()
+        .filter_map(|(index, block)| {
+            let mut worktree = Worktree {
+                path: String::new(),
+                head: String::new(),
+                branch: None,
+                detached: false,
+                bare: false,
+                current: false,
+                main: index == 0,
+                locked: false,
+                lock_reason: None,
+                prunable: false,
+            };
+            for line in block.lines() {
+                if let Some(path) = line.strip_prefix("worktree ") {
+                    worktree.path = path.to_string();
+                } else if let Some(head) = line.strip_prefix("HEAD ") {
+                    worktree.head = head.chars().take(8).collect();
+                } else if let Some(branch) = line.strip_prefix("branch ") {
+                    worktree.branch = Some(
+                        branch
+                            .strip_prefix("refs/heads/")
+                            .unwrap_or(branch)
+                            .to_string(),
+                    );
+                } else if line == "detached" {
+                    worktree.detached = true;
+                } else if line == "bare" {
+                    worktree.bare = true;
+                } else if line == "locked" || line.starts_with("locked ") {
+                    worktree.locked = true;
+                    worktree.lock_reason = line
+                        .strip_prefix("locked ")
+                        .map(str::trim)
+                        .filter(|reason| !reason.is_empty())
+                        .map(ToOwned::to_owned);
+                } else if line == "prunable" || line.starts_with("prunable ") {
+                    worktree.prunable = true;
+                }
+            }
+            if worktree.path.is_empty() {
+                return None;
+            }
+            let path = Path::new(&worktree.path);
+            worktree.current =
+                path.canonicalize().unwrap_or_else(|_| path.to_path_buf()) == current;
+            Some(worktree)
+        })
         .collect()
 }
 
@@ -2121,5 +2257,175 @@ mod git_integration_tests {
             .files
             .iter()
             .any(|f| f.path == "-a.txt" && f.group == FileGroup::Staged));
+    }
+
+    #[test]
+    fn parses_worktree_porcelain_metadata() {
+        let out = "\
+worktree /repos/gitc
+HEAD 1111111111111111111111111111111111111111
+branch refs/heads/main
+
+worktree /repos/gitc-review
+HEAD 2222222222222222222222222222222222222222
+branch refs/heads/feature/review
+locked demo machine
+
+worktree /repos/gitc-old
+HEAD 3333333333333333333333333333333333333333
+detached
+prunable gitdir file points to non-existent location
+";
+        let worktrees = parse_worktrees(out, Path::new("/repos/gitc-review"));
+
+        assert_eq!(worktrees.len(), 3);
+        assert_eq!(worktrees[0].path, "/repos/gitc");
+        assert_eq!(worktrees[0].branch.as_deref(), Some("main"));
+        assert_eq!(worktrees[0].head, "11111111");
+        assert!(worktrees[0].main);
+        assert!(!worktrees[0].current);
+
+        assert_eq!(worktrees[1].branch.as_deref(), Some("feature/review"));
+        assert!(worktrees[1].locked);
+        assert_eq!(worktrees[1].lock_reason.as_deref(), Some("demo machine"));
+        assert!(worktrees[1].current);
+        assert!(!worktrees[1].main);
+
+        assert!(worktrees[2].detached);
+        assert!(worktrees[2].branch.is_none());
+        assert!(worktrees[2].prunable);
+        assert!(!worktrees[2].locked);
+    }
+
+    #[test]
+    fn builds_worktree_action_args() {
+        let mut add = act("worktreeAdd");
+        add.path = Some("/repos/gitc-fix".to_string());
+        add.branch = Some("fix/lanes".to_string());
+        assert_eq!(
+            action_args(&add).unwrap(),
+            vec!["worktree", "add", "/repos/gitc-fix", "fix/lanes"]
+        );
+
+        add.mode = Some("new".to_string());
+        add.target = Some("main".to_string());
+        assert_eq!(
+            action_args(&add).unwrap(),
+            vec!["worktree", "add", "-b", "fix/lanes", "/repos/gitc-fix", "main"]
+        );
+
+        let mut detach = act("worktreeAdd");
+        detach.mode = Some("detach".to_string());
+        detach.path = Some("/repos/gitc-v1".to_string());
+        detach.target = Some("v0.1.0".to_string());
+        assert_eq!(
+            action_args(&detach).unwrap(),
+            vec!["worktree", "add", "--detach", "/repos/gitc-v1", "v0.1.0"]
+        );
+
+        let mut remove = act("worktreeRemove");
+        remove.path = Some("/repos/gitc-fix".to_string());
+        assert_eq!(
+            action_args(&remove).unwrap(),
+            vec!["worktree", "remove", "/repos/gitc-fix"]
+        );
+        remove.kind = "worktreeRemoveForce".to_string();
+        assert_eq!(
+            action_args(&remove).unwrap(),
+            vec!["worktree", "remove", "--force", "/repos/gitc-fix"]
+        );
+
+        assert_eq!(
+            action_args(&act("worktreePrune")).unwrap(),
+            vec!["worktree", "prune", "-v"]
+        );
+    }
+
+    #[test]
+    fn rejects_unsafe_worktree_paths() {
+        let mut add = act("worktreeAdd");
+        add.branch = Some("fix/lanes".to_string());
+
+        add.path = Some("relative/dir".to_string());
+        assert!(action_args(&add).is_err(), "relative paths must be rejected");
+
+        add.path = Some("--force".to_string());
+        assert!(action_args(&add).is_err(), "option-like paths must be rejected");
+
+        add.path = Some("  ".to_string());
+        assert!(action_args(&add).is_err(), "blank paths must be rejected");
+
+        let mut add = act("worktreeAdd");
+        add.path = Some("/repos/gitc-fix".to_string());
+        assert!(action_args(&add).is_err(), "branch is required");
+    }
+
+    #[test]
+    fn worktree_add_list_remove_and_prune_roundtrip() {
+        let repo = TempRepo::new();
+        write_file(repo.path(), "README.md", "hello\n");
+        commit_all(repo.path(), "init");
+
+        let linked = std::env::temp_dir().join(format!(
+            "gitc-test-wt-{}-{}",
+            std::process::id(),
+            REPO_COUNTER.fetch_add(1, Ordering::SeqCst)
+        ));
+        let linked_str = linked.display().to_string();
+
+        // Add a worktree on a new branch cut from main.
+        let mut add = act("worktreeAdd");
+        add.mode = Some("new".to_string());
+        add.branch = Some("feature/wt".to_string());
+        add.path = Some(linked_str.clone());
+        add.target = Some("main".to_string());
+        let result = run_action(repo.path(), &add).unwrap();
+        assert!(result.ok, "worktree add failed: {}", result.stderr);
+
+        let state = repository_state(repo.path()).unwrap();
+        assert_eq!(state.worktrees.len(), 2);
+        let entry = state
+            .worktrees
+            .iter()
+            .find(|w| w.branch.as_deref() == Some("feature/wt"))
+            .expect("linked worktree listed");
+        assert!(!entry.main);
+        assert!(!entry.current);
+
+        // The linked worktree is itself a usable repository root.
+        let linked_state = repository_state(&linked).unwrap();
+        assert_eq!(linked_state.current_branch.as_deref(), Some("feature/wt"));
+        assert!(
+            linked_state.worktrees.iter().any(|w| w.current && !w.main),
+            "linked worktree should mark itself current"
+        );
+
+        // Removing the worktree that is currently open must be refused.
+        let mut remove_self = act("worktreeRemove");
+        remove_self.path = Some(linked_str.clone());
+        assert!(run_action(&linked, &remove_self).is_err());
+
+        // Removing it from the main worktree succeeds.
+        let result = run_action(repo.path(), &remove_self).unwrap();
+        assert!(result.ok, "worktree remove failed: {}", result.stderr);
+        assert_eq!(repository_state(repo.path()).unwrap().worktrees.len(), 1);
+
+        // A worktree whose directory vanished shows up as prunable, and prune clears it.
+        let mut add = act("worktreeAdd");
+        add.branch = Some("feature/wt".to_string());
+        add.path = Some(linked_str.clone());
+        let result = run_action(repo.path(), &add).unwrap();
+        assert!(result.ok, "re-add failed: {}", result.stderr);
+        fs::remove_dir_all(&linked).expect("delete worktree dir");
+
+        let state = repository_state(repo.path()).unwrap();
+        assert!(
+            state.worktrees.iter().any(|w| w.prunable),
+            "missing directory should be prunable"
+        );
+
+        let result = run_action(repo.path(), &act("worktreePrune")).unwrap();
+        assert!(result.ok, "prune failed: {}", result.stderr);
+        assert_eq!(repository_state(repo.path()).unwrap().worktrees.len(), 1);
     }
 }
