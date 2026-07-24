@@ -30,6 +30,7 @@
     FileStatus,
     GitAction,
     RepositoryState,
+    Worktree,
   } from "./lib/types";
 
   type AppTab = {
@@ -118,7 +119,7 @@
   let remoteOpen = false;
   let stashesOpen = true;
   let tagsOpen = false;
-  let worktreesOpen = false;
+  let worktreesOpen = true;
   let unstagedOpen = true;
   let stagedOpen = true;
   let actionsOpen = false;
@@ -128,6 +129,14 @@
   let busy = false;
   let error = "";
   let notice = "";
+  let noticeTimer: ReturnType<typeof setTimeout> | null = null;
+  let filterInput: HTMLInputElement | null = null;
+
+  // Success toasts dismiss themselves; errors stay until addressed.
+  $: if (notice) {
+    if (noticeTimer) clearTimeout(noticeTimer);
+    noticeTimer = setTimeout(() => (notice = ""), 3200);
+  }
 
   const riskyActions = new Set([
     "discard",
@@ -695,6 +704,64 @@
     execute({ kind: "createBranch", branch: name.trim(), target: hash }, `Create ${name.trim()} at ${hash.slice(0, 8)}`);
   }
 
+  function shortWorktreePath(path: string) {
+    const parts = path.split("/").filter(Boolean);
+    return parts.length > 2 ? `…/${parts.slice(-2).join("/")}` : path;
+  }
+
+  function worktreeLabel(worktree: Worktree) {
+    return worktree.branch ?? `${worktree.head} (detached)`;
+  }
+
+  function addWorktreePrompt() {
+    const branch = prompt("Branch for the new worktree (an existing name checks it out, a new name creates it)");
+    if (!branch?.trim()) return;
+    const name = branch.trim();
+    const rootParts = (state?.root ?? "").split("/").filter(Boolean);
+    const repoName = rootParts.at(-1) ?? "repo";
+    const parent = rootParts.slice(0, -1).join("/");
+    const suggested = `/${parent ? `${parent}/` : ""}${repoName}-${name.replace(/[^\w.-]+/g, "-")}`;
+    const path = prompt("Create worktree at path", suggested);
+    if (!path?.trim()) return;
+    const exists = state?.branches.some((entry) => entry.name === name) ?? false;
+    execute(
+      { kind: "worktreeAdd", path: path.trim(), branch: name, mode: exists ? "checkout" : "new" },
+      `Add worktree for ${name}`,
+    );
+  }
+
+  async function removeWorktree(worktree: Worktree) {
+    if (
+      settings.confirmRisky &&
+      !confirm(`Remove the worktree at ${worktree.path}? Its checkout directory will be deleted.`)
+    ) {
+      return;
+    }
+    busy = true;
+    error = "";
+    notice = "";
+    try {
+      let result = await runGitAction({ kind: "worktreeRemove", path: worktree.path });
+      if (
+        !result.ok &&
+        /modified or untracked files|locked working tree|use --force/i.test(result.stderr) &&
+        confirm(`${result.stderr.trim()}\n\nForce remove ${worktree.path}?`)
+      ) {
+        result = await runGitAction({ kind: "worktreeRemoveForce", path: worktree.path });
+      }
+      if (!result.ok) {
+        error = result.stderr || result.stdout || "Remove worktree failed";
+      } else {
+        notice = `Removed worktree ${worktree.path}`;
+      }
+    } catch (err) {
+      error = String(err);
+    } finally {
+      busy = false;
+    }
+    await refresh();
+  }
+
   async function copyHash(hash: string) {
     try {
       await navigator.clipboard.writeText(hash);
@@ -791,6 +858,16 @@
       settingsOpen = false;
       actionsOpen = false;
     }
+    if ((event.metaKey || event.ctrlKey) && event.altKey && event.code === "KeyF") {
+      event.preventDefault();
+      filterInput?.focus();
+      filterInput?.select();
+    }
+  }}
+  on:click={(event) => {
+    if (actionsOpen && !(event.target instanceof Element && event.target.closest(".search-actions"))) {
+      actionsOpen = false;
+    }
   }}
 />
 
@@ -861,15 +938,73 @@
 
   {#if centerMode !== "launchpad"}
     <aside class="left-panel">
-      <div class="view-tabs single">
-        <button class="active">☷ Repository</button>
+      <div class="panel-header">
+        <span class="panel-title">Repository</span>
+        <span class="panel-count">{(state?.branches.length ?? 0) + (state?.remoteBranches.length ?? 0)} refs</span>
       </div>
       <div class="filter-block">
-        <span>Viewing <strong>{(state?.branches.length ?? 0) + (state?.remoteBranches.length ?? 0)}</strong></span>
-        <input aria-label="Filter refs" bind:value={searchQuery} placeholder="Filter (⌘ + Option + f)" />
+        <input
+          aria-label="Filter refs"
+          bind:this={filterInput}
+          bind:value={searchQuery}
+          placeholder="Filter refs (⌘ + Option + F)"
+        />
       </div>
 
       <div class="nav-scroll">
+        <section class="nav-section">
+          <div class="section-head">
+            <button class="nav-row" on:click={() => (worktreesOpen = !worktreesOpen)}>
+              <span>{worktreesOpen ? "⌄" : "›"} ⧉ WORKTREES</span>
+              <strong>{state?.worktrees.length ?? 0}</strong>
+            </button>
+            {#if (state?.worktrees ?? []).some((entry) => entry.prunable)}
+              <button
+                class="section-action"
+                title="Prune worktrees whose directories are gone"
+                on:click={() => execute({ kind: "worktreePrune" }, "Prune worktrees")}
+                disabled={busy}
+              >prune</button>
+            {/if}
+            <button class="section-action" title="Add worktree…" on:click={addWorktreePrompt} disabled={busy}>+</button>
+          </div>
+          {#if worktreesOpen}
+            <div class="branch-list">
+              {#each state?.worktrees ?? [] as worktree (worktree.path)}
+                <div class="worktree-row" class:active={worktree.current} class:stale={worktree.prunable}>
+                  <button
+                    class="worktree-main"
+                    title={worktree.current ? worktree.path : `Switch to ${worktree.path}`}
+                    on:click={() => openRepositoryPath(worktree.path)}
+                    disabled={busy || worktree.current}
+                  >
+                    <span class="wt-dot"></span>
+                    <span class="wt-label">
+                      <span class="wt-name">
+                        <span class="wt-branch">{worktreeLabel(worktree)}</span>
+                        {#if worktree.main}<em>main</em>{/if}
+                        {#if worktree.locked}<em title={worktree.lockReason ?? "locked"}>locked</em>{/if}
+                        {#if worktree.prunable}<em>stale</em>{/if}
+                      </span>
+                      <small class="wt-path">{shortWorktreePath(worktree.path)}</small>
+                    </span>
+                  </button>
+                  {#if !worktree.main && !worktree.current}
+                    <button
+                      class="row-action danger"
+                      title={`Remove worktree ${worktree.path}`}
+                      on:click={() => removeWorktree(worktree)}
+                      disabled={busy}
+                    >×</button>
+                  {/if}
+                </div>
+              {:else}
+                <p class="empty">No worktrees</p>
+              {/each}
+            </div>
+          {/if}
+        </section>
+
         <section class="nav-section">
           <button class="nav-row" on:click={() => (localOpen = !localOpen)}>
             <span>{localOpen ? "⌄" : "›"} ⌂ LOCAL</span>
@@ -981,25 +1116,24 @@
           {/if}
         </section>
 
-        <section class="nav-section">
-          <button class="nav-row" on:click={() => (worktreesOpen = !worktreesOpen)}>
-            <span>{worktreesOpen ? "⌄" : "›"} ⎇ WORKTREES</span><strong>{state?.worktrees.length ?? 0}</strong>
-          </button>
-          {#if worktreesOpen}
-            <div class="branch-list">
-              {#each state?.worktrees ?? [] as worktree}
-                <button class="branch-name" on:click={() => openRepositoryPath(worktree)}><span>⎇ {worktree}</span></button>
-              {/each}
-            </div>
-          {/if}
-        </section>
       </div>
     </aside>
   {/if}
 
   <section class="graph-area">
-    {#if error}<div class="message error">{error}</div>{/if}
-    {#if notice}<div class="message ok">{notice}</div>{/if}
+    {#if busy}<div class="busy-bar" aria-hidden="true"></div>{/if}
+    {#if error}
+      <div class="message error" role="alert">
+        <span>{error}</span>
+        <button class="msg-close" title="Dismiss" on:click={() => (error = "")}>×</button>
+      </div>
+    {/if}
+    {#if notice}
+      <div class="message ok" role="status">
+        <span>{notice}</span>
+        <button class="msg-close" title="Dismiss" on:click={() => (notice = "")}>×</button>
+      </div>
+    {/if}
     {#if state?.merging || state?.rebasing}
       <div class="message conflict-banner">
         <span>
@@ -1411,7 +1545,7 @@
         <div class="modal-body">
           <label class="checkbox">
             <input type="checkbox" bind:checked={settings.confirmRisky} />
-            Confirm destructive actions (discard, reset, force push, drop stash)
+            Confirm destructive actions (discard, reset, force push, drop stash, remove worktree)
           </label>
           <div class="field">
             <label for="settings-clone-path">Default clone / create directory</label>

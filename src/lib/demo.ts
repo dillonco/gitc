@@ -9,6 +9,7 @@ import type {
   GitResult,
   RepositoryState,
   StashEntry,
+  Worktree,
 } from "./types";
 
 // In-memory demo repository used when the UI runs without a Tauri backend.
@@ -132,6 +133,7 @@ interface DemoState {
   stashes: StashEntry[];
   tags: string[];
   branches: { name: string; current: boolean; upstream?: string | null }[];
+  worktrees: Worktree[];
 }
 
 const demo: DemoState = {
@@ -155,7 +157,46 @@ const demo: DemoState = {
     { name: "feature/commit-details", current: true, upstream: "origin/feature/commit-details" },
     { name: "feature/hunk-staging", current: false, upstream: null },
     { name: "feature/graph", current: false, upstream: null },
+    { name: "release/0.2", current: false, upstream: "origin/release/0.2" },
     { name: "main", current: false, upstream: "origin/main" },
+  ],
+  worktrees: [
+    {
+      path: "/Users/christine/dev/gitc",
+      head: "d41f22a1",
+      branch: "feature/commit-details",
+      detached: false,
+      bare: false,
+      current: true,
+      main: true,
+      locked: false,
+      lockReason: null,
+      prunable: false,
+    },
+    {
+      path: "/Users/christine/dev/gitc-release",
+      head: "9c31e07b",
+      branch: "release/0.2",
+      detached: false,
+      bare: false,
+      current: false,
+      main: false,
+      locked: false,
+      lockReason: null,
+      prunable: false,
+    },
+    {
+      path: "/Volumes/scratch/gitc-bisect",
+      head: "77aa41c0",
+      branch: null,
+      detached: true,
+      bare: false,
+      current: false,
+      main: false,
+      locked: false,
+      lockReason: null,
+      prunable: true,
+    },
   ],
 };
 
@@ -265,7 +306,7 @@ function repositoryState(): RepositoryState {
     remotes: ["origin"],
     remoteBranches: ["origin/main", "origin/feature/commit-details", "origin/release/0.2"],
     tags: [...demo.tags],
-    worktrees: [demo.root],
+    worktrees: demo.worktrees.map((entry) => ({ ...entry, current: entry.path === demo.root })),
     stashes: demo.stashes.map((entry) => ({ ...entry })),
     userName: "Christine Ware",
   };
@@ -408,6 +449,63 @@ function runAction(action: GitAction): GitResult {
       demo.rebasing = false;
       demo.files = demo.files.filter((entry) => entry.group !== "conflicted");
       return ok();
+    case "worktreeAdd": {
+      const path = action.path?.trim();
+      if (!path) return fail("worktree path is required");
+      if (demo.worktrees.some((entry) => entry.path === path)) {
+        return fail(`fatal: '${path}' already exists`);
+      }
+      const mode = action.mode ?? "checkout";
+      const branch = action.branch?.trim() ?? "";
+      if (mode !== "detach" && !branch) return fail("branch is required");
+      if (mode === "new") {
+        if (demo.branches.some((entry) => entry.name === branch)) {
+          return fail(`fatal: a branch named '${branch}' already exists`);
+        }
+        demo.branches = [...demo.branches, { name: branch, current: false, upstream: null }];
+      } else if (mode === "checkout") {
+        if (!demo.branches.some((entry) => entry.name === branch)) {
+          return fail(`fatal: invalid reference: ${branch}`);
+        }
+        if (demo.worktrees.some((entry) => entry.branch === branch)) {
+          return fail(`fatal: '${branch}' is already used by worktree`);
+        }
+      }
+      demo.worktrees = [
+        ...demo.worktrees,
+        {
+          path,
+          head: demoCommits[0].shortHash,
+          branch: mode === "detach" ? null : branch,
+          detached: mode === "detach",
+          bare: false,
+          current: false,
+          main: false,
+          locked: false,
+          lockReason: null,
+          prunable: false,
+        },
+      ];
+      return ok(`Preparing worktree (${mode === "new" ? `new branch '${branch}'` : branch || action.target})`);
+    }
+    case "worktreeRemove":
+    case "worktreeRemoveForce": {
+      const path = action.path?.trim();
+      const entry = demo.worktrees.find((item) => item.path === path);
+      if (!entry) return fail(`fatal: '${path}' is not a working tree`);
+      if (entry.main) return fail(`fatal: '${path}' is a main working tree`);
+      if (entry.path === demo.root) return fail("cannot remove the worktree that is currently open");
+      if (entry.locked && action.kind === "worktreeRemove") {
+        return fail(`fatal: cannot remove a locked working tree, lock reason: ${entry.lockReason ?? "unknown"}`);
+      }
+      demo.worktrees = demo.worktrees.filter((item) => item.path !== path);
+      return ok();
+    }
+    case "worktreePrune": {
+      const pruned = demo.worktrees.filter((entry) => entry.prunable);
+      demo.worktrees = demo.worktrees.filter((entry) => !entry.prunable);
+      return ok(pruned.map((entry) => `Removing worktrees/${entry.path.split("/").at(-1)}: gitdir file points to non-existent location`).join("\n"));
+    }
     case "fetch":
     case "fetchAll":
     case "pull":
@@ -497,9 +595,17 @@ export async function demoInvoke<T>(command: string, args: Record<string, unknow
       return ok() as T;
     case "run_git_action":
       return runAction(args.action as GitAction) as T;
-    case "set_repository_path":
-      demo.root = String(args.path);
+    case "set_repository_path": {
+      const path = String(args.path);
+      demo.root = path;
+      // Switching into another worktree also switches the checked-out branch.
+      const worktree = demo.worktrees.find((entry) => entry.path === path);
+      if (worktree?.branch) {
+        demo.currentBranch = worktree.branch;
+        demo.branches = demo.branches.map((entry) => ({ ...entry, current: entry.name === worktree.branch }));
+      }
       return repositoryState() as T;
+    }
     case "create_repository":
     case "clone_repository":
       demo.root = String(args.path);
