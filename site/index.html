@@ -647,8 +647,8 @@
   <div class="nav">
     <a class="wordmark" href="#main"><b>git</b>c</a>
     <nav>
-      <a href="#plumbing">Internals</a>
       <a href="#features">Features</a>
+      <a href="#plumbing">Internals</a>
       <a href="#get">Get it</a>
       <a class="gh" href="https://github.com/dillonco/gitc">GitHub</a>
     </nav>
@@ -768,38 +768,6 @@
     <p class="mock-note">rendered in HTML for this page — build it to see the real one</p>
   </section>
 
-  <section id="plumbing">
-    <div class="wrap">
-      <span class="kicker">Under the hood</span>
-      <h2>It runs git. Literally.</h2>
-      <div class="split">
-        <div class="split-copy">
-          <p>
-            The Rust core doesn't reimplement git — it drives the git CLI you
-            already have installed and trusts its answers. Whatever your
-            hooks, config, and credential helpers do on the command line,
-            they do here too.
-          </p>
-          <ul role="list">
-            <li>Svelte UI in a native webview via Tauri, so the app stays small and starts fast.</li>
-            <li>Every mutation is a real git command, so it all lands in your reflog.</li>
-            <li>The git layer is covered by integration tests that run real git against real repositories.</li>
-          </ul>
-        </div>
-        <figure class="term">
-          <figcaption class="bar">gitc → git</figcaption>
-          <dl tabindex="0">
-            <div><dt class="ui">graph</dt><dd><span class="cmd">git log --all --topo-order --parents</span></dd></div>
-            <div><dt class="ui">stage</dt><dd><span class="cmd">git apply --cached</span> <span class="flag">hunk.patch</span></dd></div>
-            <div><dt class="ui">pull</dt><dd><span class="cmd">git pull</span> <span class="flag">--ff-only</span> <span class="cmd">origin main</span></dd></div>
-            <div><dt class="ui">push</dt><dd><span class="cmd">git push</span> <span class="flag">--force-with-lease</span> <span class="cmd">origin fix/lanes</span></dd></div>
-            <div><dt class="ui">blame</dt><dd><span class="cmd">git blame --porcelain src/lib/git.ts</span></dd></div>
-          </dl>
-        </figure>
-      </div>
-    </div>
-  </section>
-
   <section id="features">
     <div class="wrap">
       <span class="kicker">What's in the box</span>
@@ -870,6 +838,38 @@
         when you're reading: a drawn graph you can scan, the diff beside it,
         hunks you can click. When the terminal is faster, use the terminal.
       </p>
+    </div>
+  </section>
+
+  <section id="plumbing">
+    <div class="wrap">
+      <span class="kicker">Under the hood</span>
+      <h2>It runs git. Literally.</h2>
+      <div class="split">
+        <div class="split-copy">
+          <p>
+            The Rust core doesn't reimplement git — it drives the git CLI you
+            already have installed and trusts its answers. Whatever your
+            hooks, config, and credential helpers do on the command line,
+            they do here too.
+          </p>
+          <ul role="list">
+            <li>Svelte UI in a native webview via Tauri, so the app stays small and starts fast.</li>
+            <li>Every mutation is a real git command, so it all lands in your reflog.</li>
+            <li>The git layer is covered by integration tests that run real git against real repositories.</li>
+          </ul>
+        </div>
+        <figure class="term">
+          <figcaption class="bar">gitc → git</figcaption>
+          <dl tabindex="0">
+            <div><dt class="ui">graph</dt><dd><span class="cmd">git log --all --topo-order --parents</span></dd></div>
+            <div><dt class="ui">stage</dt><dd><span class="cmd">git apply --cached</span> <span class="flag">hunk.patch</span></dd></div>
+            <div><dt class="ui">pull</dt><dd><span class="cmd">git pull</span> <span class="flag">--ff-only</span> <span class="cmd">origin main</span></dd></div>
+            <div><dt class="ui">push</dt><dd><span class="cmd">git push</span> <span class="flag">--force-with-lease</span> <span class="cmd">origin fix/lanes</span></dd></div>
+            <div><dt class="ui">blame</dt><dd><span class="cmd">git blame --porcelain src/lib/git.ts</span></dd></div>
+          </dl>
+        </figure>
+      </div>
     </div>
   </section>
 
