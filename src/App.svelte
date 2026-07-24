@@ -920,12 +920,12 @@
 
   {#if centerMode !== "launchpad"}
     <aside class="left-panel">
-      <div class="view-tabs single">
-        <button class="active">☷ Repository</button>
+      <div class="panel-header">
+        <span class="panel-title">Repository</span>
+        <span class="panel-count">{(state?.branches.length ?? 0) + (state?.remoteBranches.length ?? 0)} refs</span>
       </div>
       <div class="filter-block">
-        <span>Viewing <strong>{(state?.branches.length ?? 0) + (state?.remoteBranches.length ?? 0)}</strong></span>
-        <input aria-label="Filter refs" bind:value={searchQuery} placeholder="Filter (⌘ + Option + f)" />
+        <input aria-label="Filter refs" bind:value={searchQuery} placeholder="Filter refs (⌘ + Option + F)" />
       </div>
 
       <div class="nav-scroll">
