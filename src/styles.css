@@ -53,11 +53,8 @@ body {
   min-height: 100vh;
   overflow: hidden;
   background:
-    radial-gradient(52rem 38rem at 8% -12%, rgba(110, 168, 254, 0.22), transparent 60%),
-    radial-gradient(48rem 36rem at 96% -6%, rgba(79, 209, 181, 0.19), transparent 62%),
-    radial-gradient(40rem 32rem at -8% 70%, rgba(79, 209, 181, 0.12), transparent 60%),
-    radial-gradient(46rem 38rem at 106% 82%, rgba(110, 168, 254, 0.14), transparent 62%),
-    radial-gradient(52rem 40rem at 55% 112%, rgba(217, 164, 65, 0.10), transparent 65%),
+    radial-gradient(56rem 40rem at 10% -14%, rgba(110, 168, 254, 0.14), transparent 60%),
+    radial-gradient(52rem 38rem at 94% -8%, rgba(79, 209, 181, 0.11), transparent 62%),
     var(--bg);
 }
 
@@ -67,7 +64,7 @@ body::before {
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  opacity: 0.4;
+  opacity: 0.22;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.10'/%3E%3C/svg%3E");
 }
 
@@ -154,7 +151,7 @@ p {
   grid-template-columns: minmax(0, 1fr) max-content;
   align-items: center;
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.035));
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .tabs {
@@ -186,7 +183,7 @@ p {
 }
 
 .tab.active {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.045));
+  background: rgba(255, 255, 255, 0.055);
   box-shadow: inset 0 2px 0 var(--teal);
   color: #e8ecf1;
 }
@@ -399,7 +396,7 @@ p {
   border-radius: 0;
   padding: 0 12px;
   color: var(--ink);
-  font-weight: 800;
+  font-weight: 650;
   text-align: left;
 }
 
@@ -456,7 +453,7 @@ p {
 
 .branch-row.active .branch-name {
   border-color: var(--teal);
-  background: linear-gradient(180deg, rgba(79, 209, 181, 0.30), rgba(79, 209, 181, 0.16));
+  background: rgba(79, 209, 181, 0.18);
   color: #ffffff;
 }
 
@@ -473,7 +470,7 @@ p {
   display: grid;
   gap: 6px;
   border: 1px solid var(--edge);
-  border-radius: 3px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.07);
   padding: 7px 8px;
 }
@@ -487,7 +484,7 @@ p {
 .stash-info span {
   color: var(--ink);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 650;
 }
 
 .stash-info small {
@@ -532,7 +529,7 @@ p {
   background: rgba(255, 255, 255, 0.07);
   color: #aab2bd;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 650;
 }
 
 .worktree-row {
@@ -579,7 +576,6 @@ p {
 .worktree-row.active .wt-dot {
   border-color: #59d3a5;
   background: #59d3a5;
-  box-shadow: 0 0 6px rgba(89, 211, 165, 0.6);
 }
 
 .worktree-row.stale .wt-dot {
@@ -600,7 +596,7 @@ p {
   min-width: 0;
   color: var(--ink);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 650;
 }
 
 .wt-name .wt-branch {
@@ -629,7 +625,7 @@ p {
 
 .worktree-row.active .worktree-main {
   border-color: var(--teal);
-  background: linear-gradient(180deg, rgba(79, 209, 181, 0.30), rgba(79, 209, 181, 0.16));
+  background: rgba(79, 209, 181, 0.18);
 }
 
 .worktree-row.active .worktree-main:disabled {
@@ -713,12 +709,11 @@ small {
   color: #e8ecf1;
   font-size: 28px;
   font-weight: 500;
-  box-shadow: 0 2px 8px rgb(0 0 0 / 0.28);
 }
 
 .launch-actions button:hover:not(:disabled) {
   border-color: var(--edge-hi);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.07));
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .recent-repos {
@@ -787,10 +782,10 @@ small {
   grid-template-columns: 210px minmax(520px, 58vw) minmax(360px, 1fr);
   height: 34px;
   border-bottom: 1px solid var(--edge);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.07));
+  background: rgba(255, 255, 255, 0.05);
   color: #aab2bd;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 650;
 }
 
 .graph-head span {
@@ -826,15 +821,14 @@ small {
   margin-left: 12px;
   overflow: hidden;
   border: 1px solid rgba(79, 209, 181, 0.55);
-  border-radius: 4px;
-  background: linear-gradient(180deg, rgba(79, 209, 181, 0.45), rgba(79, 209, 181, 0.22));
+  border-radius: 6px;
+  background: rgba(79, 209, 181, 0.24);
   padding: 5px 9px;
   color: #eefcf8;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
-  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
 }
 
 .wip-graph {
@@ -851,8 +845,7 @@ small {
   bottom: -2px;
   left: 24.5px;
   width: 2px;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--teal) 80%, #ffffff 8%), var(--teal));
-  box-shadow: 0 0 7px color-mix(in srgb, var(--teal) 26%, transparent);
+  background: var(--teal);
 }
 
 .wip-node {
@@ -864,8 +857,7 @@ small {
   transform: translate(-50%, -50%);
   border: 3px dotted var(--teal);
   border-radius: 50%;
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.045), rgba(13, 15, 20, 0.55));
-  box-shadow: 0 0 10px color-mix(in srgb, var(--teal) 36%, transparent);
+  background: rgba(13, 15, 20, 0.6);
 }
 
 .wip-summary {
@@ -891,7 +883,7 @@ small {
 
 .wip-message > strong {
   color: #aab2bd;
-  font-weight: 800;
+  font-weight: 650;
 }
 
 .wip-count {
@@ -901,7 +893,7 @@ small {
   gap: 8px;
   min-width: 58px;
   height: 36px;
-  border-radius: 4px;
+  border-radius: 6px;
   background: rgba(245, 166, 35, 0.12);
   color: #e8ecf1;
   font-size: 18px;
@@ -935,7 +927,7 @@ small {
 }
 
 .commit-row.active {
-  background: linear-gradient(90deg, rgba(110, 168, 254, 0.22), rgba(110, 168, 254, 0.06));
+  background: rgba(110, 168, 254, 0.13);
   box-shadow: inset 3px 0 0 #4f83d6;
 }
 
@@ -959,7 +951,6 @@ small {
 .branch-cell .more-pill {
   flex: none;
   padding: 3px 6px;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.35);
   color: #e8ecf1;
 }
 
@@ -968,19 +959,13 @@ small {
   max-width: 180px;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--ref-color) 42%, rgba(255, 255, 255, 0.07));
-  border-radius: 4px;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--ref-color) 34%, rgba(255, 255, 255, 0.07)),
-    color-mix(in srgb, var(--ref-color) 20%, rgba(20, 23, 29, 0.50))
-  );
-  box-shadow:
-    inset 3px 0 0 var(--ref-color),
-    0 1px 3px rgb(0 0 0 / 0.35);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--ref-color) 22%, rgba(20, 23, 29, 0.55));
+  box-shadow: inset 3px 0 0 var(--ref-color);
   padding: 3px 8px;
   color: #e8ecf1;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1000,13 +985,7 @@ small {
   left: calc(24.5px + var(--lane) * 34px);
   z-index: 1;
   width: 2px;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--lane-color) 82%, #ffffff 6%),
-    var(--lane-color) 55%,
-    color-mix(in srgb, var(--lane-color) 86%, rgba(13, 15, 20, 0.55))
-  );
-  box-shadow: 0 0 7px color-mix(in srgb, var(--lane-color) 26%, transparent);
+  background: var(--lane-color);
 }
 
 .graph-rail.rail-start {
@@ -1051,12 +1030,11 @@ small {
   place-items: center;
   border: 2px solid var(--lane-color);
   border-radius: 50%;
-  background: linear-gradient(160deg, rgba(110, 168, 254, 0.07), rgba(13, 15, 20, 0.55));
+  background: rgba(13, 15, 20, 0.6);
   color: #e8ecf1;
   font-size: 8px;
-  font-weight: 800;
+  font-weight: 650;
   letter-spacing: 0.02em;
-  box-shadow: 0 0 9px color-mix(in srgb, var(--lane-color) 34%, transparent);
 }
 
 .commit-main {
@@ -1161,15 +1139,14 @@ small {
 
 .stage-file {
   border-color: #3f7a4d;
-  background: linear-gradient(180deg, #2f6e44, #245534);
+  background: #2a5c3d;
   color: #e9fbe4;
-  font-weight: 800;
-  text-shadow: 0 1px 1px rgb(0 0 0 / 0.3);
+  font-weight: 650;
 }
 
 .stage-file:hover:not(:disabled) {
   border-color: #4f9a60;
-  background: linear-gradient(180deg, #377e4f, #2a613c);
+  background: #336e49;
 }
 
 .file-diff-toolbar {
@@ -1318,7 +1295,7 @@ small {
 }
 
 .changes-title strong span {
-  border-radius: 3px;
+  border-radius: 5px;
   background: rgba(79, 209, 181, 0.32);
   padding: 2px 5px;
 }
@@ -1344,7 +1321,7 @@ small {
 .segmented {
   display: flex;
   border: 1px solid var(--edge-hi);
-  border-radius: 3px;
+  border-radius: 8px;
   overflow: hidden;
 }
 
@@ -1354,9 +1331,8 @@ small {
 }
 
 .segmented button.active {
-  background: linear-gradient(180deg, rgba(110, 168, 254, 0.28), rgba(110, 168, 254, 0.20));
+  background: rgba(110, 168, 254, 0.22);
   color: #ffffff;
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08);
 }
 
 .change-list {
@@ -1373,19 +1349,19 @@ small {
   padding: 0 10px;
   color: var(--ink);
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 650;
 }
 
 .change-group-head button {
   border-color: #3f7a4d;
-  background: linear-gradient(180deg, #2c5a3c, #224731);
+  background: #27503a;
   color: #dff5da;
-  font-weight: 800;
+  font-weight: 650;
 }
 
 .change-group-head button:hover:not(:disabled) {
   border-color: #4f9a60;
-  background: linear-gradient(180deg, #336846, #285238);
+  background: #2f6244;
 }
 
 .change-group-head .section-toggle {
@@ -1452,7 +1428,7 @@ small {
 .file-name span {
   color: #73c16c;
   font-family: "SFMono-Regular", Consolas, monospace;
-  font-weight: 800;
+  font-weight: 650;
 }
 
 .file-name strong {
@@ -1494,7 +1470,7 @@ small {
   padding: 0 0 8px;
   color: #e8ecf1;
   font-size: 16px;
-  font-weight: 800;
+  font-weight: 650;
 }
 
 .checkbox {
@@ -1515,7 +1491,7 @@ small {
   display: grid;
   border: 1px solid var(--edge);
   border-bottom: 0;
-  border-radius: 4px 4px 0 0;
+  border-radius: 8px 8px 0 0;
   background: rgba(255, 255, 255, 0.045);
 }
 
@@ -1565,18 +1541,16 @@ summary {
   width: 100%;
   min-height: 48px;
   border-color: #3f7a4d;
-  border-radius: 4px;
-  background: linear-gradient(180deg, #338052 0%, #26603a 100%);
+  border-radius: 8px;
+  background: #2d7047;
   color: #eefbea;
   font-size: 15px;
-  font-weight: 800;
-  text-shadow: 0 1px 1px rgb(0 0 0 / 0.3);
-  box-shadow: 0 1px 5px rgb(0 0 0 / 0.3);
+  font-weight: 650;
 }
 
 .commit-button:hover:not(:disabled) {
   border-color: #4f9a60;
-  background: linear-gradient(180deg, #3a8f5c 0%, #2c6e43 100%);
+  background: #35804f;
 }
 
 .merge-editor {
@@ -1587,7 +1561,7 @@ summary {
   z-index: 10;
   max-height: 58vh;
   border: 1px solid var(--edge);
-  border-radius: 4px;
+  border-radius: 10px;
   background: rgba(20, 23, 29, 0.50);
   box-shadow: 0 18px 50px rgb(0 0 0 / 0.45);
   overflow: hidden;
@@ -1629,7 +1603,7 @@ summary {
   flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--edge);
-  border-radius: 3px;
+  border-radius: 8px;
   background: rgba(13, 15, 20, 0.55);
 }
 
@@ -1823,11 +1797,10 @@ summary {
   place-items: center;
   border: 2px solid var(--teal);
   border-radius: 50%;
-  background: linear-gradient(160deg, rgba(110, 168, 254, 0.07), rgba(13, 15, 20, 0.55));
+  background: rgba(110, 168, 254, 0.10);
   color: #e8ecf1;
   font-size: 10px;
-  font-weight: 800;
-  box-shadow: 0 0 8px color-mix(in srgb, var(--teal) 30%, transparent);
+  font-weight: 650;
 }
 
 .detail-refs {
@@ -1880,7 +1853,7 @@ summary {
   margin: 0 0 8px;
   color: var(--ink);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 650;
 }
 
 .commit-file-row {
@@ -1909,7 +1882,7 @@ summary {
 
 .commit-file-row span {
   font-family: "SFMono-Regular", Consolas, monospace;
-  font-weight: 800;
+  font-weight: 650;
   text-align: center;
 }
 
