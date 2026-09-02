@@ -244,10 +244,6 @@ p {
   opacity: 1;
 }
 
-.muted-tab {
-  opacity: 0.65;
-}
-
 .add-tab {
   min-width: 52px;
   color: var(--ink);
@@ -728,7 +724,6 @@ p {
 
 .branch-list small,
 .empty,
-.muted,
 small {
   color: #aab2bd;
 }
@@ -751,12 +746,6 @@ small {
 .launchpad-mode .graph-area {
   grid-column: 1 / -1;
   grid-row: 2;
-}
-
-.new-tab {
-  min-width: 164px;
-  padding-left: 24px;
-  font-size: 18px;
 }
 
 .launchpad {
