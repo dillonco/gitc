@@ -745,7 +745,10 @@ fn action_args(action: &GitAction) -> Result<Vec<&str>, String> {
         "stashDrop" => vec!["stash", "drop", required(target, "target")?],
         "merge" => vec!["merge", required(target, "target")?],
         "rebase" => vec!["rebase", required(target, "target")?],
-        "mergeContinue" => vec!["merge", "--continue"],
+        // No terminal is attached, so a plain `merge --continue` would block
+        // on (or, non-interactively, refuse for) an editor to confirm the
+        // merge commit message; accept the default message instead.
+        "mergeContinue" => vec!["-c", "core.editor=true", "merge", "--continue"],
         "mergeAbort" => vec!["merge", "--abort"],
         "rebaseContinue" => vec!["rebase", "--continue"],
         "rebaseAbort" => vec!["rebase", "--abort"],
@@ -2128,6 +2131,10 @@ mod git_integration_tests {
             std::env::temp_dir().as_path(),
             &["clone", origin.path().to_str().unwrap(), clone_dir.to_str().unwrap()],
         );
+        // A plain clone has no local identity; this test commits into it directly.
+        run(&clone_dir, &["config", "user.email", "test@gitc.dev"]);
+        run(&clone_dir, &["config", "user.name", "Test User"]);
+        run(&clone_dir, &["config", "commit.gpgsign", "false"]);
 
         // Diverge: origin gets a commit, clone gets a different one.
         write_file(origin.path(), "a.txt", "origin change\n");
