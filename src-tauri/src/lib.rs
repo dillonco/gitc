@@ -649,20 +649,8 @@ fn run_git(root: &Path, args: &[&str]) -> GitResult {
 
 fn run_command(command: &mut Command, refresh: bool) -> GitResult {
     match command.output() {
-        Ok(output) => GitResult {
-            ok: output.status.success(),
-            stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-            stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-            code: output.status.code().unwrap_or(-1),
-            refresh,
-        },
-        Err(err) => GitResult {
-            ok: false,
-            stdout: String::new(),
-            stderr: err.to_string(),
-            code: -1,
-            refresh: false,
-        },
+        Ok(output) => result_from_output(output, refresh),
+        Err(err) => command_error(err),
     }
 }
 
@@ -675,43 +663,40 @@ fn run_git_with_stdin(root: &Path, args: &[&str], stdin: &str) -> GitResult {
         .stderr(Stdio::piped())
         .spawn();
 
-    match spawn {
-        Ok(mut child) => {
-            if let Some(mut child_stdin) = child.stdin.take() {
-                if let Err(err) = child_stdin.write_all(stdin.as_bytes()) {
-                    return GitResult {
-                        ok: false,
-                        stdout: String::new(),
-                        stderr: err.to_string(),
-                        code: -1,
-                        refresh: false,
-                    };
-                }
-            }
-            match child.wait_with_output() {
-                Ok(output) => GitResult {
-                    ok: output.status.success(),
-                    stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-                    stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-                    code: output.status.code().unwrap_or(-1),
-                    refresh: true,
-                },
-                Err(err) => GitResult {
-                    ok: false,
-                    stdout: String::new(),
-                    stderr: err.to_string(),
-                    code: -1,
-                    refresh: false,
-                },
-            }
+    let mut child = match spawn {
+        Ok(child) => child,
+        Err(err) => return command_error(err),
+    };
+
+    if let Some(mut child_stdin) = child.stdin.take() {
+        if let Err(err) = child_stdin.write_all(stdin.as_bytes()) {
+            return command_error(err);
         }
-        Err(err) => GitResult {
-            ok: false,
-            stdout: String::new(),
-            stderr: err.to_string(),
-            code: -1,
-            refresh: false,
-        },
+    }
+
+    match child.wait_with_output() {
+        Ok(output) => result_from_output(output, true),
+        Err(err) => command_error(err),
+    }
+}
+
+fn result_from_output(output: std::process::Output, refresh: bool) -> GitResult {
+    GitResult {
+        ok: output.status.success(),
+        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        code: output.status.code().unwrap_or(-1),
+        refresh,
+    }
+}
+
+fn command_error(err: impl std::fmt::Display) -> GitResult {
+    GitResult {
+        ok: false,
+        stdout: String::new(),
+        stderr: err.to_string(),
+        code: -1,
+        refresh: false,
     }
 }
 
@@ -760,7 +745,10 @@ fn action_args(action: &GitAction) -> Result<Vec<&str>, String> {
         "stashDrop" => vec!["stash", "drop", required(target, "target")?],
         "merge" => vec!["merge", required(target, "target")?],
         "rebase" => vec!["rebase", required(target, "target")?],
-        "mergeContinue" => vec!["merge", "--continue"],
+        // No terminal is attached, so a plain `merge --continue` would block
+        // on (or, non-interactively, refuse for) an editor to confirm the
+        // merge commit message; accept the default message instead.
+        "mergeContinue" => vec!["-c", "core.editor=true", "merge", "--continue"],
         "mergeAbort" => vec!["merge", "--abort"],
         "rebaseContinue" => vec!["rebase", "--continue"],
         "rebaseAbort" => vec!["rebase", "--abort"],
@@ -2143,6 +2131,10 @@ mod git_integration_tests {
             std::env::temp_dir().as_path(),
             &["clone", origin.path().to_str().unwrap(), clone_dir.to_str().unwrap()],
         );
+        // A plain clone has no local identity; this test commits into it directly.
+        run(&clone_dir, &["config", "user.email", "test@gitc.dev"]);
+        run(&clone_dir, &["config", "user.name", "Test User"]);
+        run(&clone_dir, &["config", "commit.gpgsign", "false"]);
 
         // Diverge: origin gets a commit, clone gets a different one.
         write_file(origin.path(), "a.txt", "origin change\n");

@@ -776,12 +776,6 @@
     centerMode = "launchpad";
   }
 
-  async function openFromPicker() {
-    const path = await pickRepositoryFolder();
-    if (!path) return;
-    await openRepositoryPath(path);
-  }
-
   function moveHunk(direction: 1 | -1) {
     if (hunkRows.length === 0) return;
     selectedHunk = (selectedHunk + direction + hunkRows.length) % hunkRows.length;
@@ -1168,7 +1162,7 @@
       <div class="launchpad">
         <h1>Repositories</h1>
         <div class="launch-actions">
-          <button on:click={openFromPicker}>▰ Open</button>
+          <button on:click={switchRepository}>▰ Open</button>
           <button on:click={openClonePrompt}>☁ Clone</button>
           <button on:click={openCreatePrompt}>⊞ Create</button>
         </div>
