@@ -6,8 +6,42 @@ on:
   pull_request:
 
 jobs:
-  frontend:
+  # Routes the heavy jobs to the Mac Pro self-hosted runners when one is online
+  # and idle, otherwise falls back to GitHub-hosted. Reads the repo secret
+  # RUNNER_STATUS_PAT to check this repo's runners.
+  pick-runner:
     runs-on: ubuntu-latest
+    outputs:
+      label: ${{ steps.choose.outputs.label }}
+    steps:
+      - id: choose
+        env:
+          GH_TOKEN: ${{ secrets.RUNNER_STATUS_PAT }}
+          IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
+        run: |
+          # Never route untrusted fork PRs to the self-hosted runner — their code
+          # would execute on the host and could persist secrets across jobs.
+          if [ "$IS_FORK" = "true" ]; then
+            echo "fork PR, staying on hosted"
+            echo "label=hosted" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # gh prints API errors (bad or expired token, network) on stdout, so guard
+          # on the result being a number rather than trusting the exit status.
+          n=$(gh api repos/${{ github.repository }}/actions/runners \
+              --jq '[.runners[]|select(.status=="online" and .busy==false)|select(any(.labels[];.name=="macpro-linux"))]|length' 2>/dev/null || true)
+          case "$n" in ''|*[!0-9]*) echo "runner lookup failed, falling back to hosted"; n=0 ;; esac
+          echo "idle macpro-linux runners: $n"
+          if [ "$n" -gt 0 ]; then
+            echo "label=macpro" >> "$GITHUB_OUTPUT"
+          else
+            echo "label=hosted" >> "$GITHUB_OUTPUT"
+          fi
+
+  frontend:
+    needs: pick-runner
+    timeout-minutes: 25
+    runs-on: ${{ needs.pick-runner.outputs.label == 'macpro' && fromJSON('["self-hosted","macpro-linux"]') || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -21,7 +55,9 @@ jobs:
       - run: npm run build:ui
 
   rust:
-    runs-on: ubuntu-latest
+    needs: pick-runner
+    timeout-minutes: 40
+    runs-on: ${{ needs.pick-runner.outputs.label == 'macpro' && fromJSON('["self-hosted","macpro-linux"]') || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
