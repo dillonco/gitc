@@ -6,8 +6,30 @@ on:
   pull_request:
 
 jobs:
-  frontend:
+  # Routes the heavy jobs to the Mac Pro self-hosted runners when one is online
+  # and idle, otherwise falls back to GitHub-hosted. Reads the repo secret
+  # RUNNER_STATUS_PAT to check this repo's runners.
+  pick-runner:
     runs-on: ubuntu-latest
+    outputs:
+      label: ${{ steps.choose.outputs.label }}
+    steps:
+      - id: choose
+        env:
+          GH_TOKEN: ${{ secrets.RUNNER_STATUS_PAT }}
+        run: |
+          n=$(gh api repos/${{ github.repository }}/actions/runners \
+              --jq '[.runners[]|select(.status=="online" and .busy==false)|select(any(.labels[];.name=="macpro-linux"))]|length' 2>/dev/null || echo 0)
+          if [ "${n:-0}" -gt 0 ]; then
+            echo "label=macpro" >> "$GITHUB_OUTPUT"
+          else
+            echo "label=hosted" >> "$GITHUB_OUTPUT"
+          fi
+
+  frontend:
+    needs: pick-runner
+    timeout-minutes: 25
+    runs-on: ${{ needs.pick-runner.outputs.label == 'macpro' && fromJSON('["self-hosted","macpro-linux"]') || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -21,7 +43,9 @@ jobs:
       - run: npm run build:ui
 
   rust:
-    runs-on: ubuntu-latest
+    needs: pick-runner
+    timeout-minutes: 40
+    runs-on: ${{ needs.pick-runner.outputs.label == 'macpro' && fromJSON('["self-hosted","macpro-linux"]') || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
