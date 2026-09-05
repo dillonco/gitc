@@ -18,9 +18,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.RUNNER_STATUS_PAT }}
         run: |
+          # gh prints API errors (bad/expired token, network) on stdout, so guard
+          # on the result being a number rather than trusting the exit status.
           n=$(gh api repos/${{ github.repository }}/actions/runners \
-              --jq '[.runners[]|select(.status=="online" and .busy==false)|select(any(.labels[];.name=="macpro-linux"))]|length' 2>/dev/null || echo 0)
-          if [ "${n:-0}" -gt 0 ]; then
+              --jq '[.runners[]|select(.status=="online" and .busy==false)|select(any(.labels[];.name=="macpro-linux"))]|length' 2>/dev/null || true)
+          case "$n" in ''|*[!0-9]*) echo "runner lookup failed, falling back to hosted"; n=0 ;; esac
+          echo "idle macpro-linux runners: $n"
+          if [ "$n" -gt 0 ]; then
             echo "label=macpro" >> "$GITHUB_OUTPUT"
           else
             echo "label=hosted" >> "$GITHUB_OUTPUT"
