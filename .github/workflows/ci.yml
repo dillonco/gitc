@@ -17,8 +17,16 @@ jobs:
       - id: choose
         env:
           GH_TOKEN: ${{ secrets.RUNNER_STATUS_PAT }}
+          IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
         run: |
-          # gh prints API errors (bad/expired token, network) on stdout, so guard
+          # Never route untrusted fork PRs to the self-hosted runner — their code
+          # would execute on the host and could persist secrets across jobs.
+          if [ "$IS_FORK" = "true" ]; then
+            echo "fork PR, staying on hosted"
+            echo "label=hosted" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # gh prints API errors (bad or expired token, network) on stdout, so guard
           # on the result being a number rather than trusting the exit status.
           n=$(gh api repos/${{ github.repository }}/actions/runners \
               --jq '[.runners[]|select(.status=="online" and .busy==false)|select(any(.labels[];.name=="macpro-linux"))]|length' 2>/dev/null || true)
