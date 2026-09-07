@@ -971,6 +971,17 @@ small {
   color: #aab2bd;
 }
 
+/* Own rule rather than joining the colour list above, which also covers
+   <small> — an empty state is a row in a list and needs the same inset as
+   the rows it stands in for, not to sit flush against the panel border. */
+.empty {
+  margin: 0;
+  /* 16px matches the section heads it sits directly beneath, so the empty
+     state lines up with them rather than hanging left of the chevron. */
+  padding: 9px 12px 9px 16px;
+  font-size: 13px;
+}
+
 .graph-area {
   /* Lane geometry lives here so pitch, dot size and column width stay in step. */
   --lane-pitch: 22px;
