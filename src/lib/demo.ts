@@ -11,6 +11,7 @@ import type {
   GhStatus,
   GitAction,
   GitResult,
+  RefCompare,
   RepositoryState,
   StashEntry,
   Worktree,
@@ -779,6 +780,82 @@ function runAction(action: GitAction): GitResult {
   }
 }
 
+// ---- F2: ref compare (demo helpers) ----
+// `demoCommits` is a small, hand-built DAG (not a strict single-parent chain —
+// several commits are merges), so ref-to-ref compare walks it with real
+// ancestor sets rather than assuming a linear history.
+
+function resolveDemoRef(ref: string): DemoCommit {
+  const trimmed = ref.trim();
+  const byHash = demoCommits.find((entry) => entry.hash === trimmed || entry.shortHash === trimmed);
+  if (byHash) return byHash;
+  const byLabel = demoCommits.find((entry) =>
+    entry.refs.some((label) => label === trimmed || label === `HEAD -> ${trimmed}` || label === `tag:${trimmed}`),
+  );
+  if (byLabel) return byLabel;
+  throw new Error(`unknown ref '${ref}'`);
+}
+
+function demoAncestors(hash: string): Set<string> {
+  const seen = new Set<string>();
+  const stack = [hash];
+  while (stack.length) {
+    const current = stack.pop() as string;
+    if (seen.has(current)) continue;
+    seen.add(current);
+    const commit = demoCommits.find((entry) => entry.hash === current);
+    if (commit) stack.push(...commit.parents);
+  }
+  return seen;
+}
+
+function demoMergeBase(aHash: string, bHash: string): string | null {
+  const ancestorsA = demoAncestors(aHash);
+  const ancestorsB = demoAncestors(bHash);
+  // `demoCommits` is already newest-first, so the first hash common to both
+  // ancestor sets is the most recent common ancestor.
+  const common = demoCommits.find((entry) => ancestorsA.has(entry.hash) && ancestorsB.has(entry.hash));
+  return common?.hash ?? null;
+}
+
+function asCommitNode({ email, date, body, files, ...node }: DemoCommit): CommitNode {
+  return { ...node };
+}
+
+function buildRefCompare(baseInput: string | null, headInput: string, threeDot: boolean): RefCompare {
+  const baseRef = baseInput?.trim() || "main";
+  const base = resolveDemoRef(baseRef);
+  const head = resolveDemoRef(headInput);
+
+  const baseAncestors = demoAncestors(base.hash);
+  const headAncestors = demoAncestors(head.hash);
+  const aheadCommits = demoCommits.filter((entry) => headAncestors.has(entry.hash) && !baseAncestors.has(entry.hash));
+  const behindCommits = demoCommits.filter((entry) => baseAncestors.has(entry.hash) && !headAncestors.has(entry.hash));
+
+  // Three-dot (since merge base) only shows what head itself contributed;
+  // two-dot (direct) also surfaces base's own unique changes, since a direct
+  // diff includes whatever base did that head never picked up.
+  const fileSource = threeDot ? aheadCommits : [...aheadCommits, ...behindCommits];
+  const files = new Map<string, CommitFileChange>();
+  for (const commit of fileSource) {
+    for (const change of commit.files) {
+      if (!files.has(change.path)) files.set(change.path, change);
+    }
+  }
+
+  return {
+    base: baseRef,
+    head: headInput,
+    mergeBase: demoMergeBase(base.hash, head.hash),
+    threeDot,
+    ahead: aheadCommits.length,
+    behind: behindCommits.length,
+    files: [...files.values()],
+    commits: aheadCommits.map(asCommitNode),
+    commitsTruncated: false,
+  };
+}
+
 export async function demoInvoke<T>(command: string, args: Record<string, unknown>): Promise<T> {
   switch (command) {
     case "get_repository_state":
@@ -880,9 +957,15 @@ export async function demoInvoke<T>(command: string, args: Record<string, unknow
       ) as T;
     // ---- F2: ref compare ----
     case "get_ref_compare":
-      throw new Error("demo backend: get_ref_compare not implemented yet");
-    case "get_ref_file_diff":
-      throw new Error("demo backend: get_ref_file_diff not implemented yet");
+      return buildRefCompare((args.base as string | null) ?? null, String(args.head), Boolean(args.threeDot)) as T;
+    case "get_ref_file_diff": {
+      const baseRef = (args.base as string | null)?.trim() || "main";
+      resolveDemoRef(baseRef);
+      resolveDemoRef(String(args.head));
+      const path = String(args.path);
+      const diff = demoDiffs[path] ?? demoDiffs["docs/roadmap.md"];
+      return { path, staged: false, diff, binary: false } as FileDiff as T;
+    }
     // ---- F3: gh clone ----
     case "gh_status":
       return {

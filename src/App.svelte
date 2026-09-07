@@ -104,13 +104,15 @@
   let selectedDiff: FileDiff | null = null;
   let diffContext: "worktree" | "commit" = "worktree";
   let commitFilePath = "";
-  let centerMode: "graph" | "file" | "launchpad" = "graph";
+  let centerMode: "graph" | "file" | "launchpad" | "compare" = "graph";
   let fileViewMode: "diff" | "file" | "blame" | "history" = "diff";
   let fileText = "";
   let splitDiff = false;
   let selectedHunk = 0;
   let conflict: ConflictFile | null = null;
   // F2: compare state
+  let compareBase: string | null = null;
+  let compareHead = "";
   let resolvedContent = "";
   let commitMessage = "";
   let commitDescription = "";
@@ -400,6 +402,7 @@
     selectedDiff = null;
     diffContext = "worktree";
     commitFilePath = "";
+    compareHead = "";
   }
 
   async function openConflict(file: FileStatus) {
@@ -681,6 +684,32 @@
   }
   // F2: compare helpers
 
+  function openCompare(base: string | null, head: string) {
+    compareBase = base;
+    compareHead = head;
+    centerMode = "compare";
+  }
+
+  function commitRowTitle(row: GraphRow): string {
+    if (selectedCommit && selectedCommit.hash !== row.commit.hash) {
+      return `Shift-click to compare with ${selectedCommit.shortHash}`;
+    }
+    return row.labels.join("  ");
+  }
+
+  function handleCommitRowClick(event: MouseEvent, row: GraphRow, rowIndex: number) {
+    if (event.shiftKey && selectedCommit && selectedCommit.hash !== row.commit.hash) {
+      const selectedIndex = visibleGraphRows.findIndex((item) => item.commit.hash === selectedCommit?.hash);
+      // Rows are newest-first, so a larger index means an older commit; the
+      // older commit always becomes the base or every diff comes out reversed.
+      const older = selectedIndex > rowIndex ? selectedCommit : row.commit;
+      const newer = selectedIndex > rowIndex ? row.commit : selectedCommit;
+      openCompare(older.hash, newer.hash);
+      return;
+    }
+    selectCommit(row.commit);
+  }
+
   function createBranchAtCommit(hash: string) {
     const name = prompt("Branch name for this commit");
     if (!name?.trim()) return;
@@ -920,6 +949,7 @@
         <button title="Pull" on:click={() => execute({ kind: "pull" }, "Pull")} disabled={busy}>⇩<span>Pull</span></button>
         <button title="Push" on:click={() => execute({ kind: "push" }, "Push")} disabled={busy}>⇧<span>Push</span></button>
         <button title="Branch" on:click={createBranchFromToolbar}>⑂<span>Branch</span></button>
+        <button title="Compare refs (shift-click two commits in the graph)" on:click={() => openCompare(null, currentBranch)}>⇄<span>Compare</span></button>
         <button title="Stash" on:click={() => execute({ kind: "stashCreate", message: "gitc stash" }, "Create stash")} disabled={busy}>▤<span>Stash</span></button>
         <button title="Terminal" on:click={openRepoTerminal} disabled={busy}>⌁<span>Terminal</span></button>
       </div>
@@ -1213,6 +1243,18 @@
         </section>
       </div>
     <!-- F2: compare center mode -->
+    {:else if centerMode === "compare"}
+      {#await import("./lib/CompareView.svelte") then module}
+        <svelte:component
+          this={module.default}
+          base={compareBase}
+          head={compareHead}
+          branches={state?.branches ?? []}
+          remoteBranches={state?.remoteBranches ?? []}
+          tags={state?.tags ?? []}
+          onClose={closeFileView}
+        />
+      {/await}
     {:else if centerMode === "file" && diffContext === "commit"}
       <div class="file-diff-shell commit-context">
         <header class="file-diff-header">
@@ -1317,8 +1359,13 @@
             </span>
           </div>
         </div>
-        {#each visibleGraphRows as row}
-          <button class="commit-row" class:active={selectedCommit?.hash === row.commit.hash} on:click={() => selectCommit(row.commit)}>
+        {#each visibleGraphRows as row, rowIndex}
+          <button
+            class="commit-row"
+            class:active={selectedCommit?.hash === row.commit.hash}
+            title={commitRowTitle(row)}
+            on:click={(event) => handleCommitRowClick(event, row, rowIndex)}
+          >
             <span class="branch-cell" title={row.labels.join("  ")}>
               {#if row.labels.length}
                 <span class="ref-pill" style={`--ref-color:${row.color}`}>{row.labels[0]}</span>
