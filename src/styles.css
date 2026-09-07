@@ -243,7 +243,7 @@ p {
 
 .shell {
   display: grid;
-  grid-template-columns: 362px minmax(420px, 1fr) 351px;
+  grid-template-columns: 290px minmax(420px, 1fr) 351px;
   /* 44px matches the reference's repo bar. Both the repo/branch stack and
      the icon-over-label toolbar buttons fit once their line-heights are
      pinned and the caption drops to 10px — see .repo-select / .top-actions. */
