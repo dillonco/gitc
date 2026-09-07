@@ -119,9 +119,6 @@ export interface FileDiff {
   binary: boolean;
 }
 
-
-// ---- F1: branch & worktree cleanup ----
-
 export interface BranchAudit {
   name: string;
   current: boolean;
@@ -150,9 +147,6 @@ export interface BranchCleanupReport {
 }
 
 
-
-// ---- F2: ref compare ----
-
 export interface RefCompare {
   base: string;
   head: string;
@@ -165,9 +159,6 @@ export interface RefCompare {
   commitsTruncated: boolean;
 }
 
-
-
-// ---- F3: gh clone ----
 
 export interface GhStatus {
   installed: boolean;
@@ -193,9 +184,6 @@ export interface GhRepo {
   defaultBranch?: string | null;
 }
 
-
-
-// ---- F4: rebase ----
 
 export interface RebaseStep {
   action: string;

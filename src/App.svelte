@@ -18,11 +18,9 @@
     setRepositoryPath,
   } from "./lib/git";
   import DiffTable from "./lib/DiffTable.svelte";
-  // F1: component import (lazy-loaded at the mount anchor below; see REVIEW-PERF.md 2.3)
   import FileGroup from "./lib/FileGroup.svelte";
   import ReadonlyPane from "./lib/ReadonlyPane.svelte";
   import { parseDiffRows } from "./lib/diffRows";
-  // F3: component import
   import type {
     CommitDetail,
     CommitFileChange,
@@ -34,7 +32,6 @@
     RepositoryState,
     Worktree,
   } from "./lib/types";
-  // F2: component import
 
   type AppTab = {
     id: string;
@@ -42,7 +39,6 @@
     label: string;
     path?: string;
   };
-  // F4: component import
 
   type GraphLane = {
     index: number;
@@ -110,7 +106,6 @@
   let splitDiff = false;
   let selectedHunk = 0;
   let conflict: ConflictFile | null = null;
-  // F2: compare state
   let compareBase: string | null = null;
   let compareHead = "";
   let resolvedContent = "";
@@ -120,7 +115,6 @@
   let commandTarget = "";
   let branchName = "";
   let resetMode = "mixed";
-  // F4: rebase state
   let rebaseOpen = false;
   let rebaseMode: "interactive" | "plain" = "interactive";
   let rebaseBase: string | null = null;
@@ -133,7 +127,6 @@
   let stashesOpen = true;
   let tagsOpen = false;
   let worktreesOpen = true;
-  // F1: cleanup state
   let cleanupOpen = false;
   let unstagedOpen = true;
   let stagedOpen = true;
@@ -146,7 +139,6 @@
   let notice = "";
   let noticeTimer: ReturnType<typeof setTimeout> | null = null;
   let filterInput: HTMLInputElement | null = null;
-  // F3: clone dialog state
   let cloneOpen = false;
 
   // Success toasts dismiss themselves; errors stay until addressed.
@@ -501,7 +493,6 @@
       busy = false;
     }
   }
-  // F3: clone helpers
   async function afterClone(next: RepositoryState) {
     // Close first: once `cloneRepository` has succeeded the dialog's job is
     // done, and any failure below (e.g. the graph reload) should surface on
@@ -685,7 +676,6 @@
     if (!name?.trim()) return;
     execute({ kind: "createTag", branch: name.trim(), target: target ?? null }, `Tag ${name.trim()}`);
   }
-  // F2: compare helpers
 
   function openCompare(base: string | null, head: string) {
     compareBase = base;
@@ -776,7 +766,6 @@
     }
     await refresh();
   }
-  // F1: cleanup helpers
 
   async function deleteBranch(name: string) {
     busy = true;
@@ -824,7 +813,6 @@
     rebaseOpen = true;
     actionsOpen = false;
   }
-  // F4: rebase helpers
 
   function showAddRepoNotice() {
     activeTabId = "launchpad";
@@ -1253,7 +1241,6 @@
           {/each}
         </section>
       </div>
-    <!-- F2: compare center mode -->
     {:else if centerMode === "compare"}
       {#await import("./lib/CompareView.svelte") then module}
         <svelte:component
@@ -1611,7 +1598,6 @@
       />
     {/await}
   {/if}
-  <!-- F4: rebase panel mount -->
 
   {#if conflict}
     <section class="merge-editor">
@@ -1639,7 +1625,6 @@
       </div>
     </section>
   {/if}
-  <!-- F3: clone dialog mount -->
   {#if cloneOpen}
     {#await import("./lib/CloneDialog.svelte") then module}
       <svelte:component
@@ -1687,7 +1672,6 @@
       </div>
     </div>
   {/if}
-  <!-- F1: cleanup panel mount -->
   {#if cleanupOpen && state}
     {#await import("./lib/CleanupPanel.svelte") then module}
       <svelte:component

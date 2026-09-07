@@ -377,7 +377,6 @@ Scratch notes for the demo repository.
 - Every mutation updates this fake state.
 `;
 
-// ---- F3: gh clone ----
 // The demo backend always looks like a signed-in `gh` with a small seeded
 // account so the CloneDialog's GitHub tab is exercisable in `npm run dev:ui`.
 const demoGhLogin = "christine";
@@ -495,8 +494,6 @@ function repositoryState(): RepositoryState {
     userName: "Christine Ware",
   };
 }
-
-// ---- F1: branch & worktree cleanup ----
 
 function demoBranchHead(name: string): string {
   const onGraph = demoCommits.find((entry) => entry.refs.some((ref) => ref === name || ref === `HEAD -> ${name}`));
@@ -773,16 +770,11 @@ function runAction(action: GitAction): GitResult {
     case "revert":
     case "reset":
       return ok();
-    // ---- F1: branch & worktree cleanup ----
-    // ---- F2: ref compare ----
-    // ---- F3: gh clone ----
-    // ---- F4: rebase ----
     default:
       return fail(`demo backend: unknown action '${action.kind}'`);
   }
 }
 
-// ---- F2: ref compare (demo helpers) ----
 // `demoCommits` is a small, hand-built DAG (not a strict single-parent chain —
 // several commits are merges), so ref-to-ref compare walks it with real
 // ancestor sets rather than assuming a linear history.
@@ -858,7 +850,6 @@ function buildRefCompare(baseInput: string | null, headInput: string, threeDot: 
   };
 }
 
-// ---- F4: rebase ----
 // `demoCommits` is ordered newest-first and, for this demo's fixed history,
 // `demoCommits[0]` is always HEAD of the current branch. Resolving a ref to
 // an index therefore also gives us "everything before this index" as the
@@ -1089,13 +1080,11 @@ export async function demoInvoke<T>(command: string, args: Record<string, unknow
       return fail("terminal is unavailable in browser demo mode") as T;
     case "pick_repository_folder":
       return "/Users/christine/dev/demo-picked" as T;
-    // ---- F1: branch & worktree cleanup ----
     case "get_branch_cleanup":
       return branchCleanupReport(
         (args.base as string | null | undefined) ?? null,
         (args.staleDays as number | null | undefined) ?? null,
       ) as T;
-    // ---- F2: ref compare ----
     case "get_ref_compare":
       return buildRefCompare((args.base as string | null) ?? null, String(args.head), Boolean(args.threeDot)) as T;
     case "get_ref_file_diff": {
@@ -1106,7 +1095,6 @@ export async function demoInvoke<T>(command: string, args: Record<string, unknow
       const diff = demoDiffs[path] ?? demoDiffs["docs/roadmap.md"];
       return { path, staged: false, diff, binary: false } as FileDiff as T;
     }
-    // ---- F3: gh clone ----
     case "gh_status":
       return {
         installed: true,
@@ -1122,7 +1110,6 @@ export async function demoInvoke<T>(command: string, args: Record<string, unknow
       const repos = owner ? demoGhRepos.filter((repo) => repo.owner.toLowerCase() === owner) : demoGhRepos;
       return repos.slice(0, limit) as T;
     }
-    // ---- F4: rebase ----
     case "get_rebase_plan":
       return rebasePlan((args.base as string | null | undefined) ?? null) as T;
     case "run_interactive_rebase":
