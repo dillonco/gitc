@@ -341,16 +341,23 @@ p {
 .repo-bar {
   grid-column: 1 / -1;
   display: grid;
-  /* The branch name gets a flexible (but capped) track — it needs room to
-     not truncate, but shouldn't swallow every free pixel either, or the
-     button groups after it end up crammed against the right edge with no
-     air between them. A second flexible track (.toolbar-spacer) sits
-     between the command buttons and Actions/Search so that cluster reads
-     as a separate, right-anchored group instead of just the tail end of
-     one long row. */
-  grid-template-columns: 160px minmax(160px, 420px) max-content minmax(24px, 1fr) max-content;
+  /* Equal flexible tracks either side of the command buttons, so that group
+     is centred on the window rather than on whatever space the repo and
+     branch controls leave behind. */
+  grid-template-columns: minmax(0, 1fr) max-content minmax(0, 1fr);
+  align-items: stretch;
   border-bottom: 1px solid var(--chrome-edge);
   background: var(--chrome);
+}
+
+.repo-group {
+  display: grid;
+  grid-template-columns: 160px minmax(0, max-content);
+  min-width: 0;
+}
+
+.search-actions {
+  justify-self: end;
 }
 
 .repo-select,
@@ -3069,8 +3076,10 @@ summary::-webkit-details-marker {
     grid-template-columns: 240px minmax(360px, 1fr) 360px;
   }
 
-  .repo-bar {
-    grid-template-columns: 140px minmax(140px, 340px) max-content minmax(16px, 1fr) max-content;
+  /* The bar keeps its three centring tracks here; only the repo/branch
+     group tightens, so the command buttons stay on the window's centre. */
+  .repo-group {
+    grid-template-columns: 140px minmax(0, max-content);
   }
 
   .top-actions button,
