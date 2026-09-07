@@ -127,7 +127,6 @@
   let stashesOpen = false;
   let tagsOpen = false;
   let worktreesOpen = false;
-  let sidebarMode: "list" | "agents" = "list";
   let cleanupOpen = false;
   let unstagedOpen = true;
   let stagedOpen = true;
@@ -989,13 +988,6 @@
 
   {#if centerMode !== "launchpad"}
     <aside class="left-panel">
-      <div class="left-panel-header">
-        <button class="back-btn" title="Back" aria-label="Back">‹</button>
-        <div class="mode-segmented" role="tablist">
-          <button class:active={sidebarMode === "list"} on:click={() => (sidebarMode = "list")}>☰ List</button>
-          <button class:active={sidebarMode === "agents"} on:click={() => (notice = "Agents is coming soon")}>🤖 Agents</button>
-        </div>
-      </div>
       <div class="viewing-row">Viewing <strong>{filteredBranches.length + filteredRemoteBranches.length}</strong></div>
       <div class="filter-block">
         <div class="filter-input-wrap">
@@ -1141,31 +1133,6 @@
             </div>
           {/if}
         </section>
-
-        <button class="nav-row disabled-row" disabled title="Cloud Patches (coming soon)">
-          <span class="nav-chevron">›</span>
-          <i class="nav-icon">☁</i>
-          <span class="nav-label">Cloud Patches</span>
-          <strong>0</strong>
-        </button>
-        <button class="nav-row disabled-row" disabled title="Pull Requests (coming soon)">
-          <span class="nav-chevron">›</span>
-          <i class="nav-icon">⇄</i>
-          <span class="nav-label">Pull Requests</span>
-          <strong>0</strong>
-        </button>
-        <button class="nav-row disabled-row" disabled title="Issues (coming soon)">
-          <span class="nav-chevron">›</span>
-          <i class="nav-icon">◎</i>
-          <span class="nav-label">Issues</span>
-          <strong>0</strong>
-        </button>
-        <button class="nav-row disabled-row" disabled title="Teams (coming soon)">
-          <span class="nav-chevron">›</span>
-          <i class="nav-icon">◈</i>
-          <span class="nav-label">Teams</span>
-          <strong>0</strong>
-        </button>
 
         <section class="nav-section">
           <button class="nav-row" on:click={() => (stashesOpen = !stashesOpen)}>
@@ -1562,7 +1529,7 @@
             disabled={!selectedFile}
           >⌫</button>
           <strong>{totalChanges} file changes on <span>{currentBranch}</span></strong>
-          <button class="ai-header-btn ai-btn" title="Refresh" on:click={refresh} disabled={busy}>✦</button>
+          <button class="refresh-btn" title="Refresh" on:click={refresh} disabled={busy}>↻</button>
         </div>
         <div class="changes-tools">
           <button class="sort-btn" title={sortAsc ? "Sorted A to Z" : "Sorted Z to A"} on:click={() => (sortAsc = !sortAsc)}>⇅<i>{sortAsc ? "AZ" : "ZA"}</i></button>
@@ -1605,30 +1572,18 @@
           <div class="split-handle"></div>
           <div class="commit-tabs">
             <button class="commit-tab">-o- Commit</button>
-            <span class="tab-icon" title="Pull request">⤓</span>
-            <span class="tab-icon" title="Cloud patch">☁</span>
-            <span class="tab-icon" title="Compare">⇄</span>
           </div>
           <label class="checkbox"><input type="checkbox" bind:checked={amendCommit} /> Amend previous commit</label>
           <div class="commit-box">
             <label class="commit-input" for="commit-message">
               <input id="commit-message" bind:value={commitMessage} maxlength="72" placeholder="Commit summary" />
               <small>{72 - commitMessage.length}</small>
-              <button type="button" class="ai-mini ai-btn" title="Compose with AI" on:click={() => (notice = "Compose with AI is coming soon")}>✦</button>
             </label>
             <textarea class="description" bind:value={commitDescription} placeholder="Description"></textarea>
           </div>
           <details>
             <summary>
               <span class="options-toggle"><i>›</i> Commit options</span>
-              <button
-                type="button"
-                class="ai-compose ai-btn"
-                on:click={(event) => {
-                  event.preventDefault();
-                  notice = "Compose with AI is coming soon";
-                }}
-              >✦ Compose commits with AI</button>
             </summary>
             <div class="field">
               <label for="branch-name">Branch</label>

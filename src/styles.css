@@ -33,9 +33,6 @@
   --red-fill: #4c3035;
   --red-text: #d2cbcc;
   --ref-pill-head-bg: #195969;
-  --ai-border: linear-gradient(90deg, #7901ca, #4a36e4, #1b6fff);
-  --ai-fill: linear-gradient(90deg, #2f1b45, #1e2c4f);
-  --ai-ink: #c8c8d2;
   --radius: 2px;
 
   font-family:
@@ -192,7 +189,7 @@ p {
 .shell {
   display: grid;
   grid-template-columns: 362px minmax(420px, 1fr) 351px;
-  grid-template-rows: 50px 56px minmax(0, 1fr) 30px;
+  grid-template-rows: 36px 40px minmax(0, 1fr) 24px;
   width: 100vw;
   height: 100vh;
   overflow: hidden;
@@ -222,10 +219,10 @@ p {
 .tab {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  min-width: 145px;
-  height: 50px;
-  padding-right: 34px;
+  gap: 8px;
+  min-width: 130px;
+  height: 36px;
+  padding-right: 28px;
   border-left: 1px solid var(--chrome-edge);
   border-radius: 0;
   color: var(--ink);
@@ -395,66 +392,8 @@ p {
   overflow-y: auto;
 }
 
-.left-panel-header {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  height: 18px;
-  padding: 25px 12px 0 4px;
-}
-
-.back-btn {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: 18px;
-  height: 18px;
-  min-height: 0;
-  border: 0;
-  border-radius: 50%;
-  background: #bfc0c2;
-  color: #1c1e24;
-  font-size: 11px;
-  padding: 0;
-}
-
-.mode-segmented {
-  display: flex;
-  flex: 1;
-  min-width: 0;
-  height: 23px;
-  border: 1px solid #77787b;
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-
-.mode-segmented button {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: #bfc0c2;
-  font-size: 13px;
-  font-weight: 400;
-}
-
-.mode-segmented button + button {
-  border-left: 1px solid #77787b;
-}
-
-.mode-segmented button.active {
-  background: var(--select);
-  color: #fff;
-  font-weight: 600;
-}
-
 .viewing-row {
-  padding: 10px 7px 0;
+  padding: 14px 7px 0;
   color: var(--ink);
   font-size: 13px;
 }
@@ -523,11 +462,6 @@ p {
   border-color: transparent;
   background: transparent;
   color: var(--ink-label);
-}
-
-.nav-row.disabled-row {
-  cursor: default;
-  opacity: 0.5;
 }
 
 .nav-row .nav-chevron {
@@ -862,7 +796,7 @@ small {
 }
 
 .launchpad-mode {
-  grid-template-rows: 50px minmax(0, 1fr) 30px;
+  grid-template-rows: 36px minmax(0, 1fr) 24px;
 }
 
 .launchpad-mode .graph-area {
@@ -873,12 +807,12 @@ small {
 .launchpad {
   height: 100%;
   overflow: auto;
-  padding: 84px 0 0 184px;
+  padding: 40px 0 0 96px;
   background: transparent;
 }
 
 .launchpad h1 {
-  margin-bottom: 36px;
+  margin-bottom: 24px;
   color: #e8ecf1;
   font-size: 34px;
   font-weight: 500;
@@ -1173,6 +1107,7 @@ small {
   justify-content: flex-start;
   width: 96px;
   height: 22px;
+  min-height: 0;
   border: 1px solid #2f3a4e;
   border-radius: var(--radius);
   background: #1e293f;
@@ -1648,27 +1583,16 @@ small {
   grid-column: 3;
   grid-row: 3;
   display: grid;
-  grid-template-rows: 35px 43px minmax(150px, 1fr) 310px;
+  grid-template-rows: 35px 43px minmax(200px, 1fr) minmax(206px, 258px);
   min-width: 0;
   border-left: 1px solid var(--edge);
   background: var(--panel);
   overflow: hidden;
 }
 
-.ai-btn {
-  border: 1px solid transparent;
-  background: var(--ai-fill) padding-box, var(--ai-border) border-box;
-  color: var(--ai-ink);
-}
-
-.ai-btn:hover:not(:disabled) {
-  background: var(--ai-fill) padding-box, var(--ai-border) border-box;
-  filter: brightness(1.12);
-}
-
 .changes-title {
   display: grid;
-  grid-template-columns: 22px minmax(0, 1fr) 27px;
+  grid-template-columns: 22px minmax(0, 1fr) 22px;
   align-items: center;
   border-bottom: 1px solid var(--edge);
   padding: 0 8px 0 10px;
@@ -1696,10 +1620,16 @@ small {
   line-height: 16px;
 }
 
-.changes-title .ai-header-btn {
-  height: 24px;
+.refresh-btn {
+  width: 22px;
+  height: 19px;
+  min-height: 0;
+  border: 1px solid var(--edge-hi);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--ink-dim);
+  font-size: 12px;
   padding: 0;
-  font-size: 13px;
 }
 
 .trash {
@@ -1963,14 +1893,14 @@ small {
 
 .commit-panel {
   border-top: 0;
-  padding: 4px 8px 10px 11px;
+  padding: 4px 8px 8px 11px;
   overflow: auto;
 }
 
 .split-handle {
   width: 99px;
   height: 4px;
-  margin: 0 auto 8px;
+  margin: 0 auto 6px;
   border-radius: var(--radius);
   background: var(--edge);
 }
@@ -1984,14 +1914,14 @@ small {
   display: flex;
   align-items: flex-end;
   gap: 22px;
-  height: 36px;
+  height: 30px;
   border-bottom: 1px solid var(--edge);
-  margin: 0 0 6px;
+  margin: 0 0 4px;
 }
 
 .commit-tab {
   width: 96px;
-  height: 30px;
+  height: 26px;
   min-height: 0;
   margin-bottom: -1px;
   border: 1px solid var(--edge);
@@ -2005,19 +1935,11 @@ small {
   text-align: left;
 }
 
-.tab-icon {
-  display: inline-flex;
-  align-items: center;
-  margin-bottom: 8px;
-  color: var(--ink-label);
-  font-size: 14px;
-}
-
 .checkbox {
   display: flex;
   align-items: center;
   gap: 10px;
-  height: 36px;
+  height: 28px;
   margin-bottom: 0;
   color: var(--ink);
   font-size: 15px;
@@ -2054,7 +1976,7 @@ small {
   border: 1px solid var(--edge);
   border-radius: 3px;
   background: var(--input-bg);
-  padding: 8px 12px 10px 13px;
+  padding: 6px 12px 8px 13px;
   margin-bottom: 0;
 }
 
@@ -2071,7 +1993,7 @@ small {
 .commit-input input {
   flex: 1;
   min-width: 0;
-  height: 30px;
+  height: 26px;
   border: 0;
   background: transparent;
   padding: 0;
@@ -2090,17 +2012,8 @@ small {
   font-size: 15px;
 }
 
-.ai-mini {
-  flex: none;
-  width: 29px;
-  height: 27px;
-  min-height: 0;
-  padding: 0;
-  font-size: 13px;
-}
-
 .description {
-  min-height: 78px;
+  min-height: 40px;
   margin-bottom: 0;
   border: 0;
   border-radius: 0;
@@ -2116,15 +2029,14 @@ small {
 }
 
 details {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   color: var(--ink);
 }
 
 summary {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  height: 46px;
+  height: 32px;
   cursor: pointer;
   padding: 0;
   list-style: none;
@@ -2143,21 +2055,6 @@ summary::-webkit-details-marker {
   font-weight: 400;
 }
 
-.ai-compose {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-width: 187px;
-  height: 24px;
-  min-height: 0;
-  padding: 0 12px;
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
 .field {
   display: grid;
   gap: 5px;
@@ -2173,7 +2070,7 @@ summary::-webkit-details-marker {
 
 .commit-button {
   width: 100%;
-  height: 40px;
+  height: 36px;
   min-height: 0;
   border-color: #3f7a4d;
   border-radius: 3px;
@@ -2181,7 +2078,7 @@ summary::-webkit-details-marker {
   color: #eefbea;
   font-size: 13px;
   font-weight: 400;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .commit-button:hover:not(:disabled) {
