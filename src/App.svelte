@@ -1174,12 +1174,14 @@
               <span class="nav-label">Local</span>
               <strong>{state?.branches.length ?? 0}</strong>
             </button>
-            <button
-              class="section-action"
-              title="Delete merged, squash-merged and gone branches…"
-              on:click={() => (cleanupOpen = true)}
-              disabled={busy}
-            >clean up</button>
+            <span class="section-actions">
+              <button
+                class="section-action"
+                title="Delete merged, squash-merged and gone branches…"
+                on:click={() => (cleanupOpen = true)}
+                disabled={busy}
+              >clean up</button>
+            </span>
           </div>
           {#if localOpen}
             <div class="branch-list">
@@ -1269,15 +1271,17 @@
               <span class="nav-label">Worktrees</span>
               <strong>{state?.worktrees.length ?? 0}</strong>
             </button>
-            {#if (state?.worktrees ?? []).some((entry) => entry.prunable)}
-              <button
-                class="section-action"
-                title="Prune worktrees whose directories are gone"
-                on:click={() => execute({ kind: "worktreePrune" }, "Prune worktrees")}
-                disabled={busy}
-              >prune</button>
-            {/if}
-            <button class="section-action" title="Add worktree…" on:click={addWorktreePrompt} disabled={busy}>+</button>
+            <span class="section-actions">
+              {#if (state?.worktrees ?? []).some((entry) => entry.prunable)}
+                <button
+                  class="section-action"
+                  title="Prune worktrees whose directories are gone"
+                  on:click={() => execute({ kind: "worktreePrune" }, "Prune worktrees")}
+                  disabled={busy}
+                >prune</button>
+              {/if}
+              <button class="section-action" title="Add worktree…" on:click={addWorktreePrompt} disabled={busy}>+</button>
+            </span>
           </div>
           {#if worktreesOpen}
             <div class="branch-list">

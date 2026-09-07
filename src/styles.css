@@ -85,6 +85,11 @@
   --ref-pill-head-bg: #195969;
   --radius: 2px;
 
+  /* Sidebar section rows: the count column is reserved so every row's number
+     lands on the same edge, and the hover action group offsets by it. */
+  --nav-count-w: 24px;
+  --nav-pad-r: 11px;
+
   font-family:
     "Noto Sans", "Open Sans", "Helvetica Neue", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #e8ecf1;
@@ -544,13 +549,13 @@ p {
 
 .nav-row {
   display: grid;
-  grid-template-columns: 10px 12px 1fr max-content;
+  grid-template-columns: 10px 12px 1fr var(--nav-count-w);
   align-items: center;
   gap: 0 6px;
   width: 100%;
   height: 29px;
   border-radius: 0;
-  padding: 0 11px 0 6px;
+  padding: 0 var(--nav-pad-r) 0 6px;
   color: var(--ink-label);
   font-size: 13px;
   font-weight: 400;
@@ -582,9 +587,14 @@ p {
   white-space: nowrap;
 }
 
+/* Reserved and right-aligned: max-content let a two-digit count sit wider
+   than a one-digit one, and tabular figures keep the digits themselves in
+   step. --nav-count-w is also what the action group offsets itself by. */
 .nav-row strong {
   color: var(--count);
   font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 
 .branch-list {
@@ -779,14 +789,23 @@ p {
 }
 
 .section-head {
+  position: relative;
   display: flex;
   align-items: center;
+}
+
+.section-actions {
+  position: absolute;
+  right: calc(var(--nav-pad-r) + var(--nav-count-w) + 8px);
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 
 .section-head .nav-row {
   flex: 1;
   min-width: 0;
-  padding-right: 6px;
+  padding-right: var(--nav-pad-r);
 }
 
 .section-head .nav-row > span {
@@ -796,7 +815,6 @@ p {
 .section-head .section-action {
   flex: none;
   min-height: 24px;
-  margin-right: 8px;
   padding: 0 7px;
   border-color: transparent;
   background: transparent;
@@ -810,6 +828,10 @@ p {
 .section-head:hover .section-action,
 .section-head .section-action:focus-visible {
   opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .section-head .section-action { transition: none; }
 }
 
 .section-head .section-action:hover:not(:disabled) {
@@ -970,33 +992,31 @@ small {
 .launchpad {
   height: 100%;
   overflow: auto;
-  padding: 40px 0 0 96px;
+  padding: 30px 0 0 44px;
   background: transparent;
 }
 
 .launchpad h1 {
-  margin-bottom: 24px;
+  margin-bottom: 18px;
   color: #e8ecf1;
-  font-size: 34px;
+  font-size: 23px;
   font-weight: 500;
 }
 
 .launch-actions {
   display: flex;
-  gap: 20px;
-  margin-bottom: 42px;
+  gap: 12px;
+  margin-bottom: 30px;
 }
 
 .launch-actions button {
-  min-width: 180px;
-  min-height: 90px;
+  min-width: 130px;
+  min-height: 58px;
   border-color: var(--edge);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  border-radius: var(--radius);
+  background: var(--panel);
   color: #e8ecf1;
-  font-size: 28px;
+  font-size: 16px;
   font-weight: 500;
 }
 
@@ -1012,9 +1032,9 @@ small {
 }
 
 .recent-repos h2 {
-  margin-bottom: 12px;
+  margin-bottom: 10px;
   color: #e8ecf1;
-  font-size: 24px;
+  font-size: 16px;
   font-weight: 500;
   text-transform: none;
 }
@@ -1022,8 +1042,8 @@ small {
 .recent-repos button {
   display: grid;
   grid-template-columns: max-content max-content;
-  gap: 22px;
-  min-height: 34px;
+  gap: 16px;
+  min-height: 27px;
   padding: 0 6px;
   border: 0;
   background: transparent;
@@ -1032,12 +1052,12 @@ small {
 
 .recent-repos strong {
   color: var(--teal);
-  font-size: 24px;
+  font-size: 14px;
 }
 
 .recent-repos span {
-  color: #aab2bd;
-  font-size: 24px;
+  color: var(--ink-dim);
+  font-size: 14px;
 }
 
 .message {
