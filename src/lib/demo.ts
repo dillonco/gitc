@@ -7,6 +7,8 @@ import type {
   ConflictFile,
   FileDiff,
   FileStatus,
+  GhRepo,
+  GhStatus,
   GitAction,
   GitResult,
   RepositoryState,
@@ -371,6 +373,98 @@ Scratch notes for the demo repository.
 - The browser build uses an in-memory backend.
 - Every mutation updates this fake state.
 `;
+
+// ---- F3: gh clone ----
+// The demo backend always looks like a signed-in `gh` with a small seeded
+// account so the CloneDialog's GitHub tab is exercisable in `npm run dev:ui`.
+const demoGhLogin = "christine";
+
+const demoGhRepos: GhRepo[] = [
+  {
+    name: "gitc",
+    nameWithOwner: "christine/gitc",
+    owner: "christine",
+    description: "A desktop git client built for the agent era",
+    isPrivate: false,
+    isFork: false,
+    isArchived: false,
+    pushedAt: "2026-09-05T19:24:10Z",
+    url: "https://github.com/christine/gitc",
+    sshUrl: "git@github.com:christine/gitc.git",
+    language: "Rust",
+    defaultBranch: "main",
+  },
+  {
+    name: "data-layer",
+    nameWithOwner: "christine/data-layer",
+    owner: "christine",
+    description: "Internal data platform services",
+    isPrivate: true,
+    isFork: false,
+    isArchived: false,
+    pushedAt: "2026-09-04T08:12:00Z",
+    url: "https://github.com/christine/data-layer",
+    sshUrl: "git@github.com:christine/data-layer.git",
+    language: "TypeScript",
+    defaultBranch: "main",
+  },
+  {
+    name: "waas",
+    nameWithOwner: "christine/waas",
+    owner: "christine",
+    description: null,
+    isPrivate: true,
+    isFork: false,
+    isArchived: false,
+    pushedAt: "2026-08-20T14:05:00Z",
+    url: "https://github.com/christine/waas",
+    sshUrl: "git@github.com:christine/waas.git",
+    language: "Go",
+    defaultBranch: "main",
+  },
+  {
+    name: "dotfiles",
+    nameWithOwner: "christine/dotfiles",
+    owner: "christine",
+    description: "Personal shell and editor configuration",
+    isPrivate: false,
+    isFork: true,
+    isArchived: false,
+    pushedAt: "2026-06-11T10:41:00Z",
+    url: "https://github.com/christine/dotfiles",
+    sshUrl: "git@github.com:christine/dotfiles.git",
+    language: "Shell",
+    defaultBranch: "main",
+  },
+  {
+    name: "old-render-engine",
+    nameWithOwner: "christine/old-render-engine",
+    owner: "christine",
+    description: "Archived prototype renderer",
+    isPrivate: false,
+    isFork: false,
+    isArchived: true,
+    pushedAt: "2025-01-04T09:00:00Z",
+    url: "https://github.com/christine/old-render-engine",
+    sshUrl: "git@github.com:christine/old-render-engine.git",
+    language: "C++",
+    defaultBranch: "master",
+  },
+  {
+    name: "gitc-plugins",
+    nameWithOwner: "osfmanagement/gitc-plugins",
+    owner: "osfmanagement",
+    description: "Community plugins for gitc",
+    isPrivate: false,
+    isFork: false,
+    isArchived: false,
+    pushedAt: "2026-09-01T17:30:00Z",
+    url: "https://github.com/osfmanagement/gitc-plugins",
+    sshUrl: "git@github.com:osfmanagement/gitc-plugins.git",
+    language: "TypeScript",
+    defaultBranch: "main",
+  },
+];
 
 function ok(stdout = ""): GitResult {
   return { ok: true, stdout, stderr: "", code: 0, refresh: true };
@@ -791,9 +885,20 @@ export async function demoInvoke<T>(command: string, args: Record<string, unknow
       throw new Error("demo backend: get_ref_file_diff not implemented yet");
     // ---- F3: gh clone ----
     case "gh_status":
-      throw new Error("demo backend: gh_status not implemented yet");
-    case "gh_repo_list":
-      throw new Error("demo backend: gh_repo_list not implemented yet");
+      return {
+        installed: true,
+        authenticated: true,
+        login: demoGhLogin,
+        host: "github.com",
+        protocol: "https",
+        message: null,
+      } as GhStatus as T;
+    case "gh_repo_list": {
+      const owner = typeof args.owner === "string" && args.owner.trim() ? args.owner.trim().toLowerCase() : null;
+      const limit = typeof args.limit === "number" && args.limit > 0 ? args.limit : 100;
+      const repos = owner ? demoGhRepos.filter((repo) => repo.owner.toLowerCase() === owner) : demoGhRepos;
+      return repos.slice(0, limit) as T;
+    }
     // ---- F4: rebase ----
     case "get_rebase_plan":
       throw new Error("demo backend: get_rebase_plan not implemented yet");

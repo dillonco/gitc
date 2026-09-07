@@ -1,7 +1,6 @@
 <script lang="ts">
   import {
     applyHunk,
-    cloneRepository,
     createRepository,
     getCommitDetail,
     getCommitFileDiff,
@@ -143,6 +142,7 @@
   let noticeTimer: ReturnType<typeof setTimeout> | null = null;
   let filterInput: HTMLInputElement | null = null;
   // F3: clone dialog state
+  let cloneOpen = false;
 
   // Success toasts dismiss themselves; errors stay until addressed.
   $: if (notice) {
@@ -475,30 +475,6 @@
     await openRepositoryPath(path);
   }
 
-  async function openClonePrompt() {
-    const url = prompt("Repository URL to clone");
-    if (!url?.trim()) return;
-    const suggested = `${settings.clonePath.replace(/\/$/, "")}/${url.split("/").pop()?.replace(/\.git$/, "") ?? "repo"}`;
-    const path = prompt("Clone into path", suggested);
-    if (!path?.trim()) return;
-    busy = true;
-    error = "";
-    try {
-      state = await cloneRepository(url.trim(), path.trim());
-      const graph = await getCommitGraph(settings.graphLimit);
-      commits = graph.commits;
-      selectedFile = null;
-      selectedDiff = null;
-      centerMode = "graph";
-      syncRepoTab(state.root, state.root.split("/").filter(Boolean).at(-1) ?? "repo");
-      notice = `Cloned ${state.root}`;
-    } catch (err) {
-      error = String(err);
-    } finally {
-      busy = false;
-    }
-  }
-
   async function openCreatePrompt() {
     const path = prompt("Create repository at path", `${settings.clonePath.replace(/\/$/, "")}/new-repo`);
     if (!path?.trim()) return;
@@ -520,6 +496,25 @@
     }
   }
   // F3: clone helpers
+  async function afterClone(next: RepositoryState) {
+    // Close first: once `cloneRepository` has succeeded the dialog's job is
+    // done, and any failure below (e.g. the graph reload) should surface on
+    // App's own error banner rather than reopen a "clone failed" state in a
+    // dialog that already reported success.
+    cloneOpen = false;
+    state = next;
+    try {
+      const graph = await getCommitGraph(settings.graphLimit);
+      commits = graph.commits;
+      selectedFile = null;
+      selectedDiff = null;
+      centerMode = "graph";
+      syncRepoTab(state.root, state.root.split("/").filter(Boolean).at(-1) ?? "repo");
+      notice = `Cloned ${state.root}`;
+    } catch (err) {
+      error = String(err);
+    }
+  }
 
   async function openRepositoryPath(path: string, silent = false) {
     busy = true;
@@ -1204,7 +1199,7 @@
         <h1>Repositories</h1>
         <div class="launch-actions">
           <button on:click={switchRepository}>▰ Open</button>
-          <button on:click={openClonePrompt}>☁ Clone</button>
+          <button on:click={() => (cloneOpen = true)}>☁ Clone</button>
           <button on:click={openCreatePrompt}>⊞ Create</button>
         </div>
         <section class="recent-repos">
@@ -1568,6 +1563,16 @@
     </section>
   {/if}
   <!-- F3: clone dialog mount -->
+  {#if cloneOpen}
+    {#await import("./lib/CloneDialog.svelte") then module}
+      <svelte:component
+        this={module.default}
+        clonePath={settings.clonePath}
+        onClose={() => (cloneOpen = false)}
+        onCloned={afterClone}
+      />
+    {/await}
+  {/if}
 
   {#if settingsOpen}
     <div
