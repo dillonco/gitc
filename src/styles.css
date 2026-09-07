@@ -729,6 +729,9 @@ small {
 }
 
 .graph-area {
+  /* Lane geometry lives here so pitch, dot size and column width stay in step. */
+  --lane-pitch: 26px;
+  --lane-center: 18.5px;
   position: relative;
   grid-column: 2;
   grid-row: 3;
@@ -942,12 +945,12 @@ small {
 
 .graph-head {
   display: grid;
-  grid-template-columns: 180px minmax(120px, calc(38px + var(--lane-count, 3) * 34px)) minmax(260px, 1fr);
-  height: 34px;
+  grid-template-columns: 156px minmax(96px, calc(28px + var(--lane-count, 3) * var(--lane-pitch, 26px))) minmax(240px, 1fr);
+  height: 28px;
   border-bottom: 1px solid var(--edge);
   background: rgba(255, 255, 255, 0.05);
   color: #aab2bd;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 650;
 }
 
@@ -967,10 +970,10 @@ small {
 .wip-row,
 .commit-row {
   display: grid;
-  grid-template-columns: 180px minmax(120px, calc(38px + var(--lane-count, 3) * 34px)) minmax(260px, 1fr);
+  grid-template-columns: 156px minmax(96px, calc(28px + var(--lane-count, 3) * var(--lane-pitch, 26px))) minmax(240px, 1fr);
   align-items: center;
   width: 100%;
-  min-height: 38px;
+  min-height: 32px;
 }
 
 .wip-row {
@@ -979,15 +982,15 @@ small {
 
 .branch-chip {
   width: max-content;
-  max-width: 186px;
-  margin-left: 12px;
+  max-width: 156px;
+  margin-left: 10px;
   overflow: hidden;
   border: 1px solid rgba(79, 209, 181, 0.55);
   border-radius: 6px;
   background: rgba(79, 209, 181, 0.24);
-  padding: 5px 9px;
+  padding: 3px 8px;
   color: #eefcf8;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -997,7 +1000,7 @@ small {
   position: relative;
   align-self: stretch;
   height: auto;
-  min-height: 38px;
+  min-height: 32px;
   border-left: 1px solid var(--edge);
   background: rgba(12, 15, 20, 0.12);
 }
@@ -1006,7 +1009,7 @@ small {
   position: absolute;
   top: 50%;
   bottom: -2px;
-  left: 24.5px;
+  left: calc(var(--lane-center) - 1px);
   width: 2px;
   background: var(--teal);
 }
@@ -1099,11 +1102,11 @@ small {
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   overflow: hidden;
-  padding: 0 12px;
+  padding: 0 10px;
   color: #a9e6d8;
-  font-size: 12px;
+  font-size: 11px;
   white-space: nowrap;
 }
 
@@ -1120,15 +1123,15 @@ small {
 
 .ref-pill {
   display: inline-block;
-  max-width: 180px;
+  max-width: 148px;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--ref-color) 42%, rgba(255, 255, 255, 0.07));
   border-radius: 6px;
   background: color-mix(in srgb, var(--ref-color) 22%, rgba(20, 23, 29, 0.55));
   box-shadow: inset 3px 0 0 var(--ref-color);
-  padding: 3px 8px;
+  padding: 2px 7px;
   color: #e8ecf1;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1138,7 +1141,7 @@ small {
   position: relative;
   align-self: stretch;
   height: auto;
-  min-height: 38px;
+  min-height: 32px;
   border-left: 1px solid var(--edge);
   background: rgba(12, 15, 20, 0.12);
 }
@@ -1147,7 +1150,7 @@ small {
   position: absolute;
   top: -2px;
   bottom: -2px;
-  left: calc(24.5px + var(--lane) * 34px);
+  left: calc(var(--lane-center) - 1px + var(--lane) * var(--lane-pitch));
   z-index: 1;
   width: 2px;
   background: var(--lane-color);
@@ -1165,9 +1168,9 @@ small {
   position: absolute;
   top: calc(50% - 1px);
   bottom: -2px;
-  left: calc(25.5px + var(--from) * 34px);
+  left: calc(var(--lane-center) + var(--from) * var(--lane-pitch));
   z-index: 2;
-  width: calc(var(--span) * 34px + 1px);
+  width: calc(var(--span) * var(--lane-pitch) + 1px);
   border-top: 2px solid var(--lane-color);
   filter: drop-shadow(0 0 4px color-mix(in srgb, var(--lane-color) 28%, transparent));
 }
@@ -1178,7 +1181,7 @@ small {
 }
 
 .graph-edge.edge-left {
-  left: calc(25.5px + var(--from) * 34px - 1px);
+  left: calc(var(--lane-center) - 1px + var(--from) * var(--lane-pitch));
   border-left: 2px solid var(--lane-color);
   border-top-left-radius: 10px;
 }
@@ -1186,18 +1189,18 @@ small {
 .commit-dot {
   position: absolute;
   top: 50%;
-  left: calc(25.5px + var(--lane) * 34px);
+  left: calc(var(--lane-center) + var(--lane) * var(--lane-pitch));
   z-index: 3;
   display: grid;
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   transform: translate(-50%, -50%);
   place-items: center;
   border: 2px solid var(--lane-color);
   border-radius: 50%;
   background: rgba(13, 15, 20, 0.6);
   color: #e8ecf1;
-  font-size: 8px;
+  font-size: 7px;
   font-weight: 650;
   letter-spacing: 0.02em;
 }
@@ -1208,7 +1211,7 @@ small {
   align-self: stretch;
   align-content: center;
   border-left: 1px solid var(--edge);
-  padding: 0 14px;
+  padding: 0 12px;
 }
 
 .commit-main strong {
@@ -1220,9 +1223,9 @@ small {
 .commit-main strong {
   display: flex;
   min-width: 0;
-  gap: 10px;
+  gap: 9px;
   color: #e8ecf1;
-  font-size: 14px;
+  font-size: 12.5px;
 }
 
 .commit-main strong span,
@@ -1438,7 +1441,7 @@ small {
   grid-column: 3;
   grid-row: 3;
   display: grid;
-  grid-template-rows: 48px 46px minmax(160px, 1fr) minmax(250px, 320px);
+  grid-template-rows: 42px 40px minmax(150px, 1fr) minmax(236px, 300px);
   min-width: 0;
   border-left: 1px solid var(--edge);
   background: rgba(255, 255, 255, 0.03);
@@ -1456,7 +1459,7 @@ small {
 
 .changes-title strong {
   overflow: hidden;
-  font-size: 14px;
+  font-size: 12.5px;
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1572,7 +1575,7 @@ small {
   display: grid;
   grid-template-columns: minmax(0, 1fr) max-content;
   align-items: center;
-  min-height: 40px;
+  min-height: 34px;
   padding: 0 10px;
 }
 
@@ -1586,7 +1589,7 @@ small {
 
 .file-name {
   display: grid;
-  grid-template-columns: 22px minmax(0, 1fr);
+  grid-template-columns: 20px minmax(0, 1fr);
   align-items: center;
   min-width: 0;
   padding: 0 4px;
@@ -1602,7 +1605,7 @@ small {
 .file-name strong {
   overflow: hidden;
   color: #e8ecf1;
-  font-size: 14px;
+  font-size: 12.5px;
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1630,10 +1633,10 @@ small {
 }
 
 .file-actions button {
-  min-height: 24px;
+  min-height: 22px;
   padding: 0 6px;
   border-color: var(--edge-hi);
-  font-size: 11px;
+  font-size: 10.5px;
 }
 
 .commit-panel {
