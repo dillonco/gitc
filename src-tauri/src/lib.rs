@@ -42,6 +42,11 @@ pub struct Branch {
     name: String,
     current: bool,
     upstream: Option<String>,
+    upstream_gone: bool,
+    ahead: u32,  // vs upstream; 0 when there is no upstream
+    behind: u32, // vs upstream
+    last_commit_unix: i64,
+    last_commit_relative: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -190,7 +195,7 @@ fn repository_state(root: &Path) -> Result<RepositoryState, String> {
             &root,
             &[
                 "branch",
-                "--format=%(HEAD)%09%(refname:short)%09%(upstream:short)",
+                "--format=%(HEAD)%09%(refname:short)%09%(upstream:short)%09%(upstream:track,nobracket)%09%(committerdate:unix)%09%(committerdate:relative)",
             ],
         )?),
         remotes: git(&root, &["remote"])?
@@ -1027,13 +1032,45 @@ fn parse_branches(out: &str) -> Vec<Branch> {
                 .next()
                 .filter(|value| !value.is_empty())
                 .map(ToOwned::to_owned);
+            let (upstream_gone, ahead, behind) = parse_track(parts.next().unwrap_or(""));
+            let last_commit_unix = parts.next().unwrap_or("0").trim().parse().unwrap_or(0);
+            let last_commit_relative = parts.next().unwrap_or("").to_string();
             Some(Branch {
                 current: head == "*",
                 name,
                 upstream,
+                upstream_gone,
+                ahead,
+                behind,
+                last_commit_unix,
+                last_commit_relative,
             })
         })
         .collect()
+}
+
+/// Parses `%(upstream:track,nobracket)`: empty when in sync, `gone` when the
+/// upstream ref was deleted, otherwise `ahead N`, `behind M`, or
+/// `ahead N, behind M`. Returns `(upstream_gone, ahead, behind)`.
+fn parse_track(field: &str) -> (bool, u32, u32) {
+    let field = field.trim();
+    if field.is_empty() {
+        return (false, 0, 0);
+    }
+    if field == "gone" {
+        return (true, 0, 0);
+    }
+    let mut ahead = 0u32;
+    let mut behind = 0u32;
+    for part in field.split(',') {
+        let part = part.trim();
+        if let Some(value) = part.strip_prefix("ahead ") {
+            ahead = value.trim().parse().unwrap_or(0);
+        } else if let Some(value) = part.strip_prefix("behind ") {
+            behind = value.trim().parse().unwrap_or(0);
+        }
+    }
+    (false, ahead, behind)
 }
 
 fn parse_stashes(out: &str) -> Vec<StashEntry> {
@@ -1185,7 +1222,7 @@ u UU N... 100644 100644 100644 100644 a b c d conflicted.txt";
 
     #[test]
     fn drops_detached_head_pseudo_branch() {
-        let out = "*\t(HEAD detached at 7d24eb3)\t\n \tmain\torigin/main";
+        let out = "*\t(HEAD detached at 7d24eb3)\t\t\t0\t\n \tmain\torigin/main\t\t1700000000\t2 days ago";
         let branches = parse_branches(out);
 
         assert_eq!(branches.len(), 1);
@@ -1214,13 +1251,22 @@ u UU N... 100644 100644 100644 100644 a b c d conflicted.txt";
 
     #[test]
     fn parses_branch_format() {
-        let out = "*\tmain\torigin/main\n \tfeature\t";
+        let out = "*\tmain\torigin/main\t\t1700000000\t2 days ago\n \tfeature\t\tgone\t1690000000\t3 months ago\n \ttopic\torigin/topic\tahead 3, behind 1\t1680000000\t4 months ago";
         let branches = parse_branches(out);
 
-        assert_eq!(branches.len(), 2);
+        assert_eq!(branches.len(), 3);
         assert!(branches[0].current);
         assert_eq!(branches[0].upstream.as_deref(), Some("origin/main"));
+        assert!(!branches[0].upstream_gone);
+        assert_eq!(branches[0].last_commit_unix, 1700000000);
+        assert_eq!(branches[0].last_commit_relative, "2 days ago");
         assert!(!branches[1].current);
+        assert!(branches[1].upstream_gone);
+        assert_eq!(branches[1].ahead, 0);
+        assert_eq!(branches[1].behind, 0);
+        assert!(!branches[2].upstream_gone);
+        assert_eq!(branches[2].ahead, 3);
+        assert_eq!(branches[2].behind, 1);
     }
 
     #[test]

@@ -19,7 +19,7 @@
     setRepositoryPath,
   } from "./lib/git";
   import DiffTable from "./lib/DiffTable.svelte";
-  // F1: component import
+  // F1: component import (lazy-loaded at the mount anchor below; see REVIEW-PERF.md 2.3)
   import FileGroup from "./lib/FileGroup.svelte";
   import ReadonlyPane from "./lib/ReadonlyPane.svelte";
   import { parseDiffRows } from "./lib/diffRows";
@@ -73,12 +73,14 @@
     confirmRisky: boolean;
     clonePath: string;
     graphLimit: number;
+    staleDays: number;
   };
 
   const defaultSettings: Settings = {
     confirmRisky: true,
     clonePath: "/Users/dillon/Documents/dev",
     graphLimit: 250,
+    staleDays: 30,
   };
 
   const seedRecentRepos: RecentRepo[] = [
@@ -128,6 +130,7 @@
   let tagsOpen = false;
   let worktreesOpen = true;
   // F1: cleanup state
+  let cleanupOpen = false;
   let unstagedOpen = true;
   let stagedOpen = true;
   let actionsOpen = false;
@@ -208,6 +211,7 @@
 
   function saveSettings() {
     settings.graphLimit = Math.min(1000, Math.max(25, Math.round(Number(settings.graphLimit)) || 250));
+    settings.staleDays = Math.min(3650, Math.max(1, Math.round(Number(settings.staleDays)) || 30));
     try {
       localStorage.setItem("gitc:settings", JSON.stringify(settings));
     } catch {
@@ -747,6 +751,38 @@
   }
   // F1: cleanup helpers
 
+  async function deleteBranch(name: string) {
+    busy = true;
+    error = "";
+    notice = "";
+    try {
+      let result = await runGitAction({ kind: "deleteBranch", branch: name });
+      if (
+        !result.ok &&
+        /not fully merged/i.test(result.stderr) &&
+        confirm(`${result.stderr.trim()}\n\nDelete ${name} anyway? Its tip stays recoverable for about two weeks.`)
+      ) {
+        result = await runGitAction({ kind: "deleteBranchForce", branch: name });
+      }
+      if (!result.ok) {
+        error = result.stderr || result.stdout || "Delete branch failed";
+      } else {
+        notice = `Deleted ${name}`;
+      }
+    } catch (err) {
+      error = String(err);
+    } finally {
+      busy = false;
+    }
+    await refresh();
+  }
+
+  // post-merge: open RebasePanel in plain mode
+  function rebaseOnto(target: string) {
+    if (settings.confirmRisky && !confirm(`Rebase ${currentBranch} onto ${target}?`)) return;
+    void execute({ kind: "rebase", target }, `Rebase onto ${target}`);
+  }
+
   async function copyHash(hash: string) {
     try {
       await navigator.clipboard.writeText(hash);
@@ -986,10 +1022,18 @@
         </section>
 
         <section class="nav-section">
-          <button class="nav-row" on:click={() => (localOpen = !localOpen)}>
-            <span>{localOpen ? "⌄" : "›"} ⌂ LOCAL</span>
-            <strong>{state?.branches.length ?? 0}</strong>
-          </button>
+          <div class="section-head">
+            <button class="nav-row" on:click={() => (localOpen = !localOpen)}>
+              <span>{localOpen ? "⌄" : "›"} ⌂ LOCAL</span>
+              <strong>{state?.branches.length ?? 0}</strong>
+            </button>
+            <button
+              class="section-action"
+              title="Delete merged, squash-merged and gone branches…"
+              on:click={() => (cleanupOpen = true)}
+              disabled={busy}
+            >clean up</button>
+          </div>
           {#if localOpen}
             <div class="branch-list">
               {#each filteredBranches as branch}
@@ -1000,13 +1044,24 @@
                     disabled={busy || branch.current}
                   >
                     <span>{branch.current ? "✓" : " "} {branch.name}</span>
-                    {#if branch.upstream}<small>{branch.upstream}</small>{/if}
+                    {#if branch.upstream || branch.upstreamGone}
+                      <small>
+                        {branch.upstreamGone ? `${branch.upstream ?? "upstream"} · gone` : branch.upstream}
+                        {#if branch.ahead || branch.behind}↑{branch.ahead} ↓{branch.behind}{/if}
+                      </small>
+                    {/if}
                   </button>
                   {#if !branch.current}
                     <button
+                      class="row-action"
+                      title={`Rebase ${currentBranch} onto ${branch.name}`}
+                      on:click={() => rebaseOnto(branch.name)}
+                      disabled={busy}
+                    >⤴</button>
+                    <button
                       class="row-action danger"
                       title={`Delete ${branch.name}`}
-                      on:click={() => execute({ kind: "deleteBranch", branch: branch.name }, `Delete ${branch.name}`)}
+                      on:click={() => deleteBranch(branch.name)}
                       disabled={busy}
                     >×</button>
                   {/if}
@@ -1528,7 +1583,7 @@
         <div class="modal-body">
           <label class="checkbox">
             <input type="checkbox" bind:checked={settings.confirmRisky} />
-            Confirm destructive actions (discard, reset, force push, drop stash, remove worktree)
+            Confirm destructive actions (discard, reset, force push, drop stash, remove worktree, delete branches)
           </label>
           <div class="field">
             <label for="settings-clone-path">Default clone / create directory</label>
@@ -1537,6 +1592,10 @@
           <div class="field">
             <label for="settings-graph-limit">Commits loaded in graph (25–1000)</label>
             <input id="settings-graph-limit" type="number" min="25" max="1000" bind:value={settings.graphLimit} />
+          </div>
+          <div class="field">
+            <label for="settings-stale-days">Branch cleanup: stale after (1–3650 days)</label>
+            <input id="settings-stale-days" type="number" min="1" max="3650" bind:value={settings.staleDays} />
           </div>
         </div>
         <div class="modal-footer">
@@ -1547,6 +1606,21 @@
     </div>
   {/if}
   <!-- F1: cleanup panel mount -->
+  {#if cleanupOpen && state}
+    {#await import("./lib/CleanupPanel.svelte") then module}
+      <svelte:component
+        this={module.default}
+        {state}
+        staleDays={settings.staleDays}
+        confirmRisky={settings.confirmRisky}
+        onClose={() => (cleanupOpen = false)}
+        onDone={async (s) => {
+          notice = s;
+          await refresh();
+        }}
+      />
+    {/await}
+  {/if}
 
   <footer class="status-bar">
     <span>⌁ {repoName}</span>

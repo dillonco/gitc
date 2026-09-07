@@ -1,4 +1,6 @@
 import type {
+  BranchAudit,
+  BranchCleanupReport,
   CommitDetail,
   CommitFileChange,
   CommitNode,
@@ -124,6 +126,17 @@ const file = (path: string, index: string, worktree: string, group: FileStatus["
   group,
 });
 
+const newDemoBranch = (name: string, current: boolean, upstream: string | null) => ({
+  name,
+  current,
+  upstream,
+  upstreamGone: false,
+  ahead: 0,
+  behind: 0,
+  lastCommitUnix: Math.floor(Date.now() / 1000),
+  lastCommitRelative: "just now",
+});
+
 interface DemoState {
   root: string;
   currentBranch: string;
@@ -132,7 +145,16 @@ interface DemoState {
   files: FileStatus[];
   stashes: StashEntry[];
   tags: string[];
-  branches: { name: string; current: boolean; upstream?: string | null }[];
+  branches: {
+    name: string;
+    current: boolean;
+    upstream?: string | null;
+    upstreamGone: boolean;
+    ahead: number;
+    behind: number;
+    lastCommitUnix: number;
+    lastCommitRelative: string;
+  }[];
   worktrees: Worktree[];
 }
 
@@ -154,11 +176,76 @@ const demo: DemoState = {
   ],
   tags: ["v0.2.0", "v0.1.0"],
   branches: [
-    { name: "feature/commit-details", current: true, upstream: "origin/feature/commit-details" },
-    { name: "feature/hunk-staging", current: false, upstream: null },
-    { name: "feature/graph", current: false, upstream: null },
-    { name: "release/0.2", current: false, upstream: "origin/release/0.2" },
-    { name: "main", current: false, upstream: "origin/main" },
+    {
+      name: "feature/commit-details",
+      current: true,
+      upstream: "origin/feature/commit-details",
+      upstreamGone: false,
+      ahead: 1,
+      behind: 0,
+      lastCommitUnix: 1783863660,
+      lastCommitRelative: "2 hours ago",
+    },
+    {
+      name: "feature/hunk-staging",
+      current: false,
+      upstream: null,
+      upstreamGone: false,
+      ahead: 0,
+      behind: 0,
+      lastCommitUnix: 1783626300,
+      lastCommitRelative: "3 days ago",
+    },
+    {
+      name: "feature/graph",
+      current: false,
+      upstream: null,
+      upstreamGone: false,
+      ahead: 0,
+      behind: 0,
+      lastCommitUnix: 1783342980,
+      lastCommitRelative: "6 days ago",
+    },
+    {
+      name: "release/0.2",
+      current: false,
+      upstream: "origin/release/0.2",
+      upstreamGone: false,
+      ahead: 2,
+      behind: 0,
+      lastCommitUnix: 1783803720,
+      lastCommitRelative: "yesterday",
+    },
+    {
+      name: "hotfix/old-login",
+      current: false,
+      upstream: "origin/hotfix/old-login",
+      upstreamGone: true,
+      ahead: 0,
+      behind: 0,
+      lastCommitUnix: 1781964000,
+      lastCommitRelative: "3 weeks ago",
+    },
+    {
+      name: "experiment/lanes",
+      current: false,
+      upstream: null,
+      upstreamGone: false,
+      ahead: 0,
+      behind: 0,
+      lastCommitUnix: 1777636800,
+      lastCommitRelative: "2 months ago",
+    },
+    {
+      name: "main",
+      current: false,
+      upstream: "origin/main",
+      upstreamGone: false,
+      ahead: 0,
+      behind: 0,
+      lastCommitUnix: 1783803720,
+      lastCommitRelative: "yesterday",
+    },
   ],
   worktrees: [
     {
@@ -312,6 +399,71 @@ function repositoryState(): RepositoryState {
   };
 }
 
+// ---- F1: branch & worktree cleanup ----
+
+function demoBranchHead(name: string): string {
+  const onGraph = demoCommits.find((entry) => entry.refs.some((ref) => ref === name || ref === `HEAD -> ${name}`));
+  if (onGraph) return onGraph.hash;
+  const fallback: Record<string, string> = {
+    "release/0.2": h(0x30),
+    "hotfix/old-login": h(0x31),
+    "experiment/lanes": h(0x32),
+  };
+  return fallback[name] ?? h(0x2f);
+}
+
+type CleanupOverride = Pick<BranchAudit, "classification"> &
+  Partial<Pick<BranchAudit, "merged" | "squashMerged" | "stale" | "aheadOfBase" | "behindBase">>;
+
+// Hard-coded per PLAN.md: feature/graph is merged, feature/hunk-staging is
+// squash-merged, release/0.2 is active, hotfix/old-login's upstream is gone,
+// and experiment/lanes is stale. Real classification math lives in the Rust
+// backend (src-tauri/src/cleanup.rs); this just gives the demo UI something
+// representative to render.
+const cleanupOverrides: Record<string, CleanupOverride> = {
+  "feature/commit-details": { classification: "current" },
+  main: { classification: "base" },
+  "feature/graph": { classification: "merged", merged: true, aheadOfBase: 0, behindBase: 4 },
+  "feature/hunk-staging": { classification: "squashMerged", squashMerged: true, aheadOfBase: 2, behindBase: 5 },
+  "release/0.2": { classification: "active", aheadOfBase: 3, behindBase: 1 },
+  "hotfix/old-login": { classification: "gone", aheadOfBase: 1, behindBase: 6 },
+  "experiment/lanes": { classification: "stale", stale: true, aheadOfBase: 2, behindBase: 9 },
+};
+
+function branchCleanupReport(base: string | null, staleDays: number | null): BranchCleanupReport {
+  const resolvedBase = base?.trim() || "main";
+  const rawStaleDays = staleDays == null || Number.isNaN(staleDays) ? 30 : Math.round(staleDays);
+  const resolvedStaleDays = Math.min(3650, Math.max(1, rawStaleDays));
+
+  const branches: BranchAudit[] = demo.branches.map((branch) => {
+    const override = cleanupOverrides[branch.name] ?? { classification: "active" };
+    const worktree = demo.worktrees.find((entry) => !entry.main && entry.branch === branch.name);
+    const head = demoBranchHead(branch.name);
+    return {
+      name: branch.name,
+      current: branch.current,
+      isBase: branch.name === resolvedBase,
+      head,
+      shortHead: head.slice(0, 7),
+      upstream: branch.upstream ?? null,
+      upstreamGone: branch.upstreamGone,
+      ahead: branch.ahead,
+      behind: branch.behind,
+      aheadOfBase: override.aheadOfBase ?? 0,
+      behindBase: override.behindBase ?? 0,
+      merged: override.merged ?? false,
+      squashMerged: override.squashMerged ?? false,
+      stale: override.stale ?? false,
+      lastCommitUnix: branch.lastCommitUnix,
+      lastCommitRelative: branch.lastCommitRelative,
+      worktreePath: worktree?.path ?? null,
+      classification: override.classification,
+    };
+  });
+
+  return { base: resolvedBase, staleDays: resolvedStaleDays, branches };
+}
+
 function removeFile(path: string, group?: FileStatus["group"]) {
   demo.files = demo.files.filter((entry) => entry.path !== path || (group ? entry.group !== group : false));
 }
@@ -374,7 +526,7 @@ function runAction(action: GitAction): GitResult {
       }
       demo.branches = [
         ...demo.branches.map((entry) => ({ ...entry, current: false })),
-        { name: action.branch ?? "new-branch", current: true, upstream: null },
+        newDemoBranch(action.branch ?? "new-branch", true, null),
       ];
       demo.currentBranch = action.branch ?? "new-branch";
       return ok();
@@ -384,6 +536,14 @@ function runAction(action: GitAction): GitResult {
       const branch = demo.branches.find((entry) => entry.name === action.branch);
       if (!branch) return fail(`branch '${action.branch}' not found`);
       if (branch.current) return fail(`cannot delete the checked out branch '${action.branch}'`);
+      // Mirror real git: a plain `-d` refuses on anything that isn't an
+      // ancestor of main; `-D` (deleteBranchForce) always succeeds.
+      const merged = cleanupOverrides[branch.name]?.merged ?? false;
+      if (action.kind === "deleteBranch" && !merged) {
+        return fail(
+          `error: The branch '${branch.name}' is not fully merged.\nIf you are sure you want to delete it, run 'git branch -D ${branch.name}'.`,
+        );
+      }
       demo.branches = demo.branches.filter((entry) => entry.name !== action.branch);
       return ok();
     }
@@ -391,7 +551,7 @@ function runAction(action: GitAction): GitResult {
       const local = (action.target ?? "").split("/").slice(1).join("/") || "tracked";
       demo.branches = [
         ...demo.branches.map((entry) => ({ ...entry, current: false })),
-        { name: local, current: true, upstream: action.target },
+        newDemoBranch(local, true, action.target ?? null),
       ];
       demo.currentBranch = local;
       return ok();
@@ -462,7 +622,7 @@ function runAction(action: GitAction): GitResult {
         if (demo.branches.some((entry) => entry.name === branch)) {
           return fail(`fatal: a branch named '${branch}' already exists`);
         }
-        demo.branches = [...demo.branches, { name: branch, current: false, upstream: null }];
+        demo.branches = [...demo.branches, newDemoBranch(branch, false, null)];
       } else if (mode === "checkout") {
         if (!demo.branches.some((entry) => entry.name === branch)) {
           return fail(`fatal: invalid reference: ${branch}`);
@@ -620,7 +780,10 @@ export async function demoInvoke<T>(command: string, args: Record<string, unknow
       return "/Users/christine/dev/demo-picked" as T;
     // ---- F1: branch & worktree cleanup ----
     case "get_branch_cleanup":
-      throw new Error("demo backend: get_branch_cleanup not implemented yet");
+      return branchCleanupReport(
+        (args.base as string | null | undefined) ?? null,
+        (args.staleDays as number | null | undefined) ?? null,
+      ) as T;
     // ---- F2: ref compare ----
     case "get_ref_compare":
       throw new Error("demo backend: get_ref_compare not implemented yet");

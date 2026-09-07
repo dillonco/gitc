@@ -11,13 +11,11 @@ export interface Branch {
   name: string;
   current: boolean;
   upstream?: string | null;
-  // F1 fields are optional for now so Stage 0 compiles without touching demo
-  // seeds; F1 makes them required and updates the seeds.
-  upstreamGone?: boolean;
-  ahead?: number;
-  behind?: number;
-  lastCommitUnix?: number;
-  lastCommitRelative?: string;
+  upstreamGone: boolean;
+  ahead: number;
+  behind: number;
+  lastCommitUnix: number;
+  lastCommitRelative: string;
 }
 
 export interface StashEntry {
