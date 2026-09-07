@@ -1543,10 +1543,6 @@ small {
    corner (see .date-marker below), so the message text needs to stop short
    of it — otherwise a long subject's ellipsis lands directly under the
    badge instead of clearing it. */
-.commit-main:has(.date-marker) {
-  padding-right: 104px;
-}
-
 .commit-main strong {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1598,11 +1594,12 @@ small {
 }
 
 .date-marker {
-  position: absolute;
-  top: 0;
-  right: 7px;
+  /* In flow (so it reserves exactly its own width) but pulled up half a
+     row, so it still sits on the boundary between rows. */
+  position: relative;
+  top: -14px;
+  flex: none;
   z-index: 4;
-  transform: translateY(-50%);
   border-radius: var(--radius);
   background: #34363d;
   padding: 2px 8px;
