@@ -257,6 +257,12 @@ p {
   background: var(--chrome);
 }
 
+/* Clear the macOS traffic lights, which the overlay title bar draws over
+   the top-left of the webview. Only in the native shell — see main.ts. */
+.native-shell .app-header .tabs {
+  padding-left: 78px;
+}
+
 .tabs {
   display: flex;
   align-self: stretch;

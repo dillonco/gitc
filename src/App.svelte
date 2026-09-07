@@ -1047,7 +1047,10 @@
 />
 
 <main class="shell" class:launchpad-mode={centerMode === "launchpad"}>
-  <header class="app-header">
+  <!-- Dragging the empty chrome moves the window: with an overlay title
+       bar there is no system title bar left to grab. Tauri checks the
+       event target, so the tabs and buttons inside still take clicks. -->
+  <header class="app-header" data-tauri-drag-region>
     <nav class="tabs" aria-label="Open repositories">
       {#each tabs as tab}
         <div class="tab-wrap">
