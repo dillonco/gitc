@@ -354,6 +354,16 @@ fn run_action(root: &Path, action: &GitAction) -> Result<GitResult, String> {
         }
     }
     let args = action_args(action)?;
+    // No terminal is attached, so `merge --continue` / `rebase --continue`
+    // would otherwise try to launch an editor: for `merge --continue` to
+    // confirm the merge commit message, and for `rebase --continue` on any
+    // step that needs one (a reword, or a squash's combined message left
+    // mid-sequence by a conflict). An env var beats an inherited
+    // `GIT_EDITOR`, which `-c core.editor=true` (kept on mergeContinue's own
+    // args below) does not override.
+    if matches!(action.kind.as_str(), "mergeContinue" | "rebaseContinue") {
+        return Ok(run_git_env(root, &args, &[("GIT_EDITOR", "true")]));
+    }
     Ok(run_git(root, &args))
 }
 
