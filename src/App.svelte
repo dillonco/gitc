@@ -190,7 +190,7 @@
   $: hunkRows = diffRows.map((row, index) => ({ row, index })).filter((item) => item.row.kind === "hunk");
   $: graphRows = buildGraphRows(commits);
   $: visibleGraphRows = filterGraphRows(graphRows, searchOpen ? searchQuery : "");
-  $: graphLaneCount = Math.max(8, ...graphRows.flatMap((row) => row.lanes.map((lane) => lane.index + 1)), 1);
+  $: graphLaneCount = Math.max(3, ...graphRows.flatMap((row) => row.lanes.map((lane) => lane.index + 1)), 1);
   $: filteredBranches = (state?.branches ?? []).filter(
     (branch) => !searchQuery.trim() || branch.name.toLowerCase().includes(searchQuery.trim().toLowerCase()),
   );
@@ -1396,7 +1396,6 @@
                 <span>{row.commit.subject}</span>
                 {#if row.commit.bodySummary}<em>{row.commit.bodySummary}</em>{/if}
               </strong>
-              <small>{row.commit.shortHash} · {row.commit.author} · {row.commit.relativeDate}</small>
             </span>
           </button>
         {:else}

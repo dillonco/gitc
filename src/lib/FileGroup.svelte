@@ -16,6 +16,16 @@
 
   $: treeRows = tree ? buildTreeRows(files, collapsed) : [];
 
+  function dirOf(path: string) {
+    const cut = path.lastIndexOf("/");
+    return cut === -1 ? "" : path.slice(0, cut + 1);
+  }
+
+  function baseOf(path: string) {
+    const cut = path.lastIndexOf("/");
+    return cut === -1 ? path : path.slice(cut + 1);
+  }
+
   function actionsFor(file: FileStatus) {
     if (file.group === "staged") return [{ kind: "unstage", label: "Unstage" }];
     if (file.group === "conflicted") return [{ kind: "markResolved", label: "Mark Resolved" }];
@@ -108,7 +118,7 @@
         <div class="file-row" class:active={selectedPath === file.path}>
           <button class="file-name" on:click={() => open(file)} title={file.path}>
             <span>{file.index}{file.worktree}</span>
-            <strong>{file.path}</strong>
+            <strong>{#if dirOf(file.path)}<i>{dirOf(file.path)}</i>{/if}{baseOf(file.path)}</strong>
           </button>
           <div class="file-actions">
             {#each actionsFor(file) as item}

@@ -942,7 +942,7 @@ small {
 
 .graph-head {
   display: grid;
-  grid-template-columns: 210px minmax(140px, calc(45px + var(--lane-count, 8) * 34px)) minmax(260px, 1fr);
+  grid-template-columns: 180px minmax(120px, calc(38px + var(--lane-count, 3) * 34px)) minmax(260px, 1fr);
   height: 34px;
   border-bottom: 1px solid var(--edge);
   background: rgba(255, 255, 255, 0.05);
@@ -967,10 +967,10 @@ small {
 .wip-row,
 .commit-row {
   display: grid;
-  grid-template-columns: 210px minmax(140px, calc(45px + var(--lane-count, 8) * 34px)) minmax(260px, 1fr);
+  grid-template-columns: 180px minmax(120px, calc(38px + var(--lane-count, 3) * 34px)) minmax(260px, 1fr);
   align-items: center;
   width: 100%;
-  min-height: 52px;
+  min-height: 38px;
 }
 
 .wip-row {
@@ -997,7 +997,8 @@ small {
   position: relative;
   align-self: stretch;
   height: auto;
-  min-height: 52px;
+  min-height: 38px;
+  border-left: 1px solid var(--edge);
   background: rgba(12, 15, 20, 0.12);
 }
 
@@ -1074,6 +1075,7 @@ small {
 
 .commit-row {
   border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.032);
   border-radius: 0;
   background: transparent;
   padding: 0;
@@ -1136,7 +1138,8 @@ small {
   position: relative;
   align-self: stretch;
   height: auto;
-  min-height: 52px;
+  min-height: 38px;
+  border-left: 1px solid var(--edge);
   background: rgba(12, 15, 20, 0.12);
 }
 
@@ -1202,7 +1205,9 @@ small {
 .commit-main {
   display: grid;
   min-width: 0;
-  gap: 3px;
+  align-self: stretch;
+  align-content: center;
+  border-left: 1px solid var(--edge);
   padding: 0 14px;
 }
 
@@ -1232,7 +1237,8 @@ small {
 }
 
 .commit-main strong em {
-  flex: 1 1 auto;
+  flex: 1 1 0;
+  min-width: 0;
   color: #aab2bd;
   font-style: normal;
   font-weight: 600;
@@ -1432,7 +1438,7 @@ small {
   grid-column: 3;
   grid-row: 3;
   display: grid;
-  grid-template-rows: 48px 46px minmax(0, 1fr) 320px;
+  grid-template-rows: 48px 46px minmax(160px, 1fr) minmax(250px, 320px);
   min-width: 0;
   border-left: 1px solid var(--edge);
   background: rgba(255, 255, 255, 0.03);
@@ -1566,8 +1572,8 @@ small {
   display: grid;
   grid-template-columns: minmax(0, 1fr) max-content;
   align-items: center;
-  min-height: 34px;
-  padding: 0 8px;
+  min-height: 40px;
+  padding: 0 10px;
 }
 
 .file-row:hover {
@@ -1605,6 +1611,22 @@ small {
 .file-actions {
   display: flex;
   gap: 4px;
+  /* Opacity rather than visibility so the buttons stay tabbable, and
+     :focus-within brings them back for keyboard users. */
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.file-row:hover .file-actions,
+.file-row:focus-within .file-actions {
+  opacity: 1;
+}
+
+/* Directory recedes, filename carries the row. */
+.file-name strong i {
+  color: #8b93a1;
+  font-style: normal;
+  font-weight: 500;
 }
 
 .file-actions button {
