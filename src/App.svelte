@@ -194,7 +194,7 @@
   $: visibleStaged = sortFiles(staged);
   $: diffRows = parseDiffRows(selectedDiff?.diff ?? "");
   $: hunkRows = diffRows.map((row, index) => ({ row, index })).filter((item) => item.row.kind === "hunk");
-  $: graphRows = buildGraphRows(commits);
+  $: graphRows = buildGraphRows(commits, totalChanges > 0);
   $: visibleGraphRows = filterGraphRows(graphRows, searchOpen ? searchQuery : "");
   // No artificial floor: a linear repo has one lane, and the graph column
   // should be sized for the lanes the data actually has, not padded for
@@ -722,7 +722,7 @@
     return (state?.worktrees ?? []).some((worktree) => worktree.branch === name);
   }
 
-  function buildGraphRows(nodes: CommitNode[]): GraphRow[] {
+  function buildGraphRows(nodes: CommitNode[], hasWip: boolean): GraphRow[] {
     const lanes: string[] = [];
     const rows: GraphRow[] = [];
 
@@ -743,8 +743,10 @@
         .map((item) => ({
           index: item.index,
           color: laneColor(item.index),
-          // The topmost lane-0 commit stays uncapped so the WIP connector reaches its dot.
-          capStart: item.index === lane && laneIsNew && !(rows.length === 0 && lane === 0),
+          // The topmost lane-0 commit is left uncapped only when a WIP row sits
+          // above it to connect to. On a clean tree nothing is up there, so
+          // capping it stops a rail stub hanging off the top of the graph.
+          capStart: item.index === lane && laneIsNew && !(rows.length === 0 && lane === 0 && hasWip),
           capEnd: item.index === lane && !firstParent,
         }));
       if (firstParent) {
