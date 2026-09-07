@@ -11,6 +11,7 @@ import type {
   GhStatus,
   GitAction,
   GitResult,
+  RebasePlan,
   RefCompare,
   RepositoryState,
   StashEntry,
@@ -856,6 +857,45 @@ function buildRefCompare(baseInput: string | null, headInput: string, threeDot: 
   };
 }
 
+// ---- F4: rebase ----
+// `demoCommits` is ordered newest-first and, for this demo's fixed history,
+// `demoCommits[0]` is always HEAD of the current branch. Resolving a ref to
+// an index therefore also gives us "everything before this index" as the
+// commits since that ref, without needing a real per-branch DAG.
+function resolveDemoRefIndex(ref: string): number {
+  const byHash = demoCommits.findIndex((entry) => entry.hash === ref || entry.hash.startsWith(ref));
+  if (byHash !== -1) return byHash;
+  return demoCommits.findIndex((entry) => entry.refs.some((label) => label === ref || label.endsWith(`-> ${ref}`)));
+}
+
+function toRebaseCommitNode(entry: DemoCommit): CommitNode {
+  const { email, date, body, files, ...node } = entry;
+  return { ...node };
+}
+
+function rebasePlan(base: string | null): RebasePlan {
+  const baseName = (base && base.trim()) || "main";
+  const baseIndex = resolveDemoRefIndex(baseName);
+  if (baseIndex === -1) throw new Error(`unknown ref '${baseName}'`);
+
+  const commits = demoCommits
+    .slice(0, baseIndex)
+    .map(toRebaseCommitNode)
+    .reverse(); // oldest first, matching the real backend's contract
+
+  const currentBranchEntry = demo.branches.find((entry) => entry.current);
+
+  return {
+    base: baseName,
+    mergeBase: demoCommits[baseIndex]?.hash ?? null,
+    commits,
+    clean: demo.files.length === 0,
+    inProgress: demo.merging || demo.rebasing,
+    currentBranch: demo.currentBranch,
+    upstream: currentBranchEntry?.upstream ?? null,
+  };
+}
+
 export async function demoInvoke<T>(command: string, args: Record<string, unknown>): Promise<T> {
   switch (command) {
     case "get_repository_state":
@@ -984,7 +1024,7 @@ export async function demoInvoke<T>(command: string, args: Record<string, unknow
     }
     // ---- F4: rebase ----
     case "get_rebase_plan":
-      throw new Error("demo backend: get_rebase_plan not implemented yet");
+      return rebasePlan((args.base as string | null | undefined) ?? null) as T;
     case "run_interactive_rebase":
       throw new Error("demo backend: run_interactive_rebase not implemented yet");
     default:

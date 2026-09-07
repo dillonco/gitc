@@ -121,6 +121,9 @@
   let branchName = "";
   let resetMode = "mixed";
   // F4: rebase state
+  let rebaseOpen = false;
+  let rebaseMode: "interactive" | "plain" = "interactive";
+  let rebaseBase: string | null = null;
   let rightTab: "path" | "tree" = "path";
   let searchOpen = false;
   let searchQuery = "";
@@ -815,6 +818,12 @@
       notice = hash;
     }
   }
+  function openRebasePanel(rebaseModeArg: "interactive" | "plain", base: string | null = null) {
+    rebaseMode = rebaseModeArg;
+    rebaseBase = base;
+    rebaseOpen = true;
+    actionsOpen = false;
+  }
   // F4: rebase helpers
 
   function showAddRepoNotice() {
@@ -960,6 +969,8 @@
           <div class="dropdown-menu" role="menu">
             <button on:click={() => execute({ kind: "fetchAll" }, "Fetch all remotes")}>Fetch All &amp; Prune</button>
             <button on:click={() => execute({ kind: "forcePush" }, "Force push")}>Force Push (with lease)</button>
+            <button on:click={() => openRebasePanel("interactive")}>Interactive Rebase…</button>
+            <button on:click={() => openRebasePanel("plain")}>Rebase onto…</button>
             <button on:click={() => createTagPrompt()}>Create Tag at HEAD…</button>
             <button
               on:click={() => {
@@ -1453,9 +1464,7 @@
                 <button on:click={() => commitDetail && createTagPrompt(commitDetail.hash)} disabled={busy}>Tag</button>
                 <button on:click={() => commitDetail && execute({ kind: "cherryPick", target: commitDetail.hash }, `Cherry-pick ${commitDetail.shortHash}`)} disabled={busy}>Cherry-pick</button>
                 <button on:click={() => commitDetail && execute({ kind: "revert", target: commitDetail.hash }, `Revert ${commitDetail.shortHash}`)} disabled={busy}>Revert</button>
-                <button class="danger" on:click={() => commitDetail && execute({ kind: "reset", target: commitDetail.hash, mode: resetMode }, `Reset to ${commitDetail.shortHash}`)} disabled={busy}>
-                  Reset here
-                </button>
+                <button on:click={() => commitDetail && openRebasePanel("plain", commitDetail.hash)} disabled={busy}>Rebase onto this</button>
               </div>
               <div class="reset-mode-row">
                 <label for="detail-reset-mode">reset mode</label>
@@ -1464,6 +1473,9 @@
                   <option value="mixed">mixed</option>
                   <option value="hard">hard</option>
                 </select>
+                <button class="danger" on:click={() => commitDetail && execute({ kind: "reset", target: commitDetail.hash, mode: resetMode }, `Reset to ${commitDetail.shortHash}`)} disabled={busy}>
+                  Reset here
+                </button>
               </div>
 
               <div class="commit-files">
@@ -1580,6 +1592,24 @@
         </div>
       {/if}
     </aside>
+  {/if}
+  {#if rebaseOpen && state}
+    {#await import("./lib/RebasePanel.svelte") then module}
+      <svelte:component
+        this={module.default}
+        currentBranch={currentBranch}
+        branches={state.branches}
+        mode={rebaseMode}
+        initialBase={rebaseBase}
+        confirmRisky={settings.confirmRisky}
+        onClose={() => (rebaseOpen = false)}
+        onDone={async (result, label) => {
+          rebaseOpen = false;
+          if (result.ok) notice = label;
+          if (result.refresh) await refresh();
+        }}
+      />
+    {/await}
   {/if}
   <!-- F4: rebase panel mount -->
 
