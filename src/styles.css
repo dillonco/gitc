@@ -1238,18 +1238,20 @@ small {
 .wip-rail {
   position: absolute;
   z-index: 1;
-  top: 50%;
+  /* Starts clear of the node rather than at its centre: the node is 22px,
+     so half of it plus 1px of air leaves the ring's interior empty. */
+  top: calc(50% + 12px);
   bottom: -2px;
-  left: calc(var(--lane-center) - 1px);
-  width: 3px;
+  left: calc(var(--lane-center) - 1.25px);
+  width: 2.5px;
   /* Dashed, like the WIP node: the run from uncommitted work down to the
      first real commit is not yet history. A repeating gradient keeps the
      dash rhythm independent of border-image quirks; 3.8/2.8 matches the
      node's dash weight so the two read as one dotted run. */
   background: repeating-linear-gradient(
     to bottom,
-    var(--teal) 0 3.8px,
-    transparent 3.8px 6.6px
+    var(--teal) 0 2.2px,
+    transparent 2.2px 4.4px
   );
 }
 
@@ -1269,14 +1271,14 @@ small {
 
 /* An SVG rather than `border: dashed`, because the browser picks its own
    dash rhythm for a circular border — finer and more numerous than the
-   reference. pathLength normalises the circumference to 110 units so a
-   7+3 period yields exactly 11 evenly spaced dashes and the ring closes
+   reference. pathLength normalises the circumference to 128 units so a
+   4+4 period yields exactly 16 evenly spaced dots and the ring closes
    cleanly; with raw px the pattern divided unevenly and left a seam. */
 .wip-node circle {
   fill: none;
   stroke: var(--teal);
-  stroke-width: 3px;
-  stroke-dasharray: 7 3;
+  stroke-width: 2.5px;
+  stroke-dasharray: 4 4;
   stroke-linecap: butt;
 }
 

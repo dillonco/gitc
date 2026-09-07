@@ -1552,7 +1552,7 @@
             <div class="wip-graph">
               <span class="wip-rail"></span>
               <svg class="wip-node" viewBox="0 0 22 22" aria-hidden="true">
-                <circle cx="11" cy="11" r="9.6" pathLength="110" />
+                <circle cx="11" cy="11" r="9.6" pathLength="128" />
               </svg>
             </div>
             <div class="wip-summary">
