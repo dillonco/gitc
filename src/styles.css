@@ -277,11 +277,14 @@ p {
 .repo-bar {
   grid-column: 1 / -1;
   display: grid;
-  /* The branch name gets the flexible track (it's the thing that actually
-     needs the room); the toolbar button groups size to their own content
-     instead of claiming a wide track and centering inside it with the
-     branch name left to truncate in a comparatively narrow fixed column. */
-  grid-template-columns: 160px minmax(160px, 1fr) max-content max-content;
+  /* The branch name gets a flexible (but capped) track — it needs room to
+     not truncate, but shouldn't swallow every free pixel either, or the
+     button groups after it end up crammed against the right edge with no
+     air between them. A second flexible track (.toolbar-spacer) sits
+     between the command buttons and Actions/Search so that cluster reads
+     as a separate, right-anchored group instead of just the tail end of
+     one long row. */
+  grid-template-columns: 160px minmax(160px, 420px) max-content minmax(24px, 1fr) max-content;
   border-bottom: 1px solid var(--chrome-edge);
   background: var(--chrome);
 }
@@ -360,18 +363,23 @@ p {
   flex-direction: column-reverse;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: 3px;
   min-width: 62px;
   border-left: 1px solid transparent;
   border-radius: 0;
-  color: var(--ink);
-  font-size: 16px;
+  /* The icon is the heavier element (bright, larger); the label is a dim
+     caption under — sorry, above — it. Plain column-reverse alone still
+     read label-first because 11px/16px is too close a ratio and both were
+     the same near-white tone. */
+  color: #e8ecf1;
+  font-size: 20px;
 }
 
 .top-actions button span,
 .search-actions button span {
-  color: var(--ink-label);
-  font-size: 11px;
+  color: var(--ink-dim);
+  font-size: 10px;
+  font-weight: 400;
 }
 
 .top-actions .dropdown-menu button,
@@ -522,8 +530,11 @@ p {
   min-width: 0;
   min-height: 28px;
   /* --depth comes from buildRefTree()'s folder nesting (branch names split
-     on "/"), so a leaf inside a folder indents further than a top-level one. */
-  padding: 0 8px 0 calc(23px + var(--depth, 0) * 16px);
+     on "/"), so a leaf inside a folder indents further than a top-level one.
+     30px (not .ref-tree-dir's 16px) because a leaf has no chevron before its
+     icon — this lines the leaf's branch glyph up with a sibling folder's
+     own icon (chevron 8px + 6px gap past the folder row's 16px base). */
+  padding: 0 8px 0 calc(30px + var(--depth, 0) * 16px);
   background: transparent;
   border-radius: 0;
   font-size: 13px;
@@ -1531,11 +1542,11 @@ small {
 
 .file-diff-shell {
   display: grid;
-  grid-template-rows: 52px 48px 34px minmax(0, 1fr);
+  grid-template-rows: 40px 36px minmax(0, 1fr);
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  background: rgba(20, 23, 29, 0.50);
+  background: var(--bg);
 }
 
 .file-diff-header {
@@ -1543,27 +1554,37 @@ small {
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid var(--edge);
-  background: rgba(255, 255, 255, 0.07);
-  padding: 0 12px 0 28px;
+  background: var(--panel);
+  padding: 0 10px 0 14px;
 }
 
 .file-diff-name {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
   color: var(--ink);
-  font-size: 15px;
+  font-size: 13px;
 }
 
 .file-diff-name strong {
   overflow: hidden;
+  color: #e8ecf1;
+  font-weight: 400;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .file-diff-name span {
-  color: #d7a14a;
+  color: var(--amber);
+  font-size: 13px;
+}
+
+.file-diff-name .at-commit {
+  flex: none;
+  color: var(--ink-dim);
+  font-size: 12px;
+  font-style: normal;
 }
 
 .file-diff-actions,
@@ -1572,24 +1593,38 @@ small {
 .hunk-toolbar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .file-diff-actions span {
-  color: #aab2bd;
+  color: var(--ink-dim);
+  font-size: 11px;
+}
+
+.file-diff-actions button {
+  min-height: 22px;
+  min-width: 0;
+  padding: 0 8px;
+  border: 1px solid var(--edge-hi);
   font-size: 12px;
 }
 
+.file-diff-actions button.active {
+  border-color: var(--select-edge);
+  background: var(--select);
+  color: #fff;
+}
+
 .stage-file {
-  border-color: #3f7a4d;
-  background: #2a5c3d;
-  color: #e9fbe4;
-  font-weight: 650;
+  border-color: var(--green-border);
+  background: var(--green-fill);
+  color: var(--green-text);
+  font-size: 12px;
+  font-weight: 400;
 }
 
 .stage-file:hover:not(:disabled) {
-  border-color: #4f9a60;
-  background: #336e49;
+  background: color-mix(in srgb, var(--green-fill) 70%, white 6%);
 }
 
 .file-diff-toolbar {
@@ -1597,8 +1632,8 @@ small {
   justify-content: safe center;
   overflow-x: auto;
   border-bottom: 1px solid var(--edge);
-  background: rgba(255, 255, 255, 0.045);
-  padding: 0 14px;
+  background: var(--panel);
+  padding: 0 12px;
 }
 
 .diff-tool-group {
@@ -1614,24 +1649,35 @@ small {
 .diff-tool-group button,
 .file-diff-toolbar .segmented button {
   min-width: 0;
-  min-height: 30px;
-  padding: 0 12px;
-  border-color: var(--edge-hi);
-  border-radius: 0;
-  background: rgba(255, 255, 255, 0.045);
-  font-size: 13px;
-  font-weight: 700;
+  min-height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--edge-hi);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 400;
   white-space: nowrap;
 }
 
 .file-diff-toolbar .segmented button.active {
-  background: rgba(110, 168, 254, 0.16);
+  border-color: var(--select-edge);
+  background: var(--select);
+  color: #fff;
 }
 
 .hunk-toolbar {
   justify-content: flex-end;
-  border-bottom: 1px solid var(--edge-hi);
-  padding: 0 18px;
+  border-bottom: 1px solid var(--edge);
+  background: var(--panel);
+  padding: 4px 12px;
+}
+
+.hunk-toolbar button {
+  min-height: 22px;
+  padding: 0 9px;
+  font-size: 11px;
+  font-weight: 400;
 }
 
 .diff-table {
@@ -1650,7 +1696,7 @@ small {
 
 .diff-line .line-no {
   border-right: 1px solid var(--edge);
-  color: #aab2bd;
+  color: var(--ink-dim);
   text-align: right;
   padding: 0 12px;
   user-select: none;
@@ -1659,14 +1705,14 @@ small {
 .diff-line code {
   overflow: visible;
   padding: 0 12px;
-  color: #e8ecf1;
+  color: var(--ink-message);
   white-space: pre;
 }
 
 .hunk-row {
-  border-top: 1px solid var(--edge-hi);
-  border-bottom: 1px solid var(--edge-hi);
-  background: rgba(255, 255, 255, 0.045);
+  border-top: 0;
+  border-bottom: 0;
+  background: var(--bg);
 }
 
 .selected-hunk {
@@ -1675,11 +1721,11 @@ small {
 }
 
 .hunk-row code {
-  color: var(--ink);
+  color: var(--ink-dim);
 }
 
 .add-row {
-  background: #23382c;
+  background: #29352d;
 }
 
 .add-row code {
@@ -1687,7 +1733,7 @@ small {
 }
 
 .del-row {
-  background: #3a2328;
+  background: #362528;
 }
 
 .del-row code {
@@ -2336,17 +2382,17 @@ summary::-webkit-details-marker {
 }
 
 .file-diff-shell.commit-context {
-  grid-template-rows: 52px minmax(0, 1fr);
+  grid-template-rows: 40px minmax(0, 1fr);
 }
 
 .hunk-count {
   margin-right: auto;
-  color: #aab2bd;
-  font-size: 12px;
+  color: var(--ink-dim);
+  font-size: 11px;
 }
 
 .meta-row code {
-  color: #aab2bd;
+  color: var(--ink-dim);
   font-style: italic;
 }
 
@@ -2358,7 +2404,7 @@ summary::-webkit-details-marker {
 
 .split-line .line-no {
   border-right: 1px solid var(--edge);
-  color: #aab2bd;
+  color: var(--ink-dim);
   text-align: right;
   padding: 0 12px;
   user-select: none;
@@ -2368,18 +2414,18 @@ summary::-webkit-details-marker {
   overflow: hidden;
   border-right: 1px solid var(--edge);
   padding: 0 12px;
-  color: #e8ecf1;
+  color: var(--ink-message);
   text-overflow: ellipsis;
   white-space: pre;
 }
 
 .split-line .del-cell {
-  background: #3a2328;
+  background: #362528;
   color: #ffd5dc;
 }
 
 .split-line .add-cell {
-  background: #23382c;
+  background: #29352d;
   color: #c8f4c3;
 }
 
@@ -2599,37 +2645,66 @@ summary::-webkit-details-marker {
   color: var(--ink-dim);
 }
 
+/* These duplicate the commit's real actions (checkout/branch/tag/cherry-pick/
+   revert/rebase/reset); the reference keeps their equivalents in a context
+   menu we aren't building, so on-screen here they should read as a minor,
+   collapsed-by-default utility strip, not compete with the panel above. */
+.commit-actions-disclosure {
+  margin: 10px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--edge);
+}
+
+.commit-actions-disclosure summary {
+  height: 24px;
+}
+
+.commit-actions-disclosure .options-toggle {
+  font-size: 12px;
+}
+
 .commit-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 6px;
-  padding: 14px 0 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 2px 0 6px;
 }
 
 .commit-actions button {
-  min-height: 30px;
-  border-color: var(--edge-hi);
-  font-size: 12px;
-  font-weight: 700;
+  min-height: 22px;
+  padding: 0 8px;
+  border-color: var(--edge);
+  color: var(--ink-dim);
+  font-size: 11px;
+  font-weight: 400;
 }
 
 .reset-mode-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding-bottom: 12px;
+  padding-bottom: 4px;
 }
 
 .reset-mode-row label {
-  color: #aab2bd;
+  color: var(--ink-dim);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 400;
   text-transform: lowercase;
 }
 
 .reset-mode-row select {
   width: auto;
-  min-width: 110px;
+  min-width: 100px;
+  height: 22px;
+  font-size: 11px;
+}
+
+.reset-mode-row button {
+  min-height: 22px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 400;
 }
 
 .commit-files {
@@ -2817,7 +2892,7 @@ summary::-webkit-details-marker {
   }
 
   .repo-bar {
-    grid-template-columns: 140px minmax(140px, 1fr) max-content max-content;
+    grid-template-columns: 140px minmax(140px, 340px) max-content minmax(16px, 1fr) max-content;
   }
 
   .top-actions button,

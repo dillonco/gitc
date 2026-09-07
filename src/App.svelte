@@ -22,6 +22,7 @@
   import ReadonlyPane from "./lib/ReadonlyPane.svelte";
   import { parseDiffRows } from "./lib/diffRows";
   import type {
+    Branch,
     CommitDetail,
     CommitFileChange,
     CommitNode,
@@ -702,6 +703,17 @@
     return asc ? sorted : sorted.reverse();
   }
 
+  // Upstream/ahead-behind detail moved off the row (it was rendering as a
+  // second line, making tree rows ragged and uneven height) and into this
+  // tooltip instead — every row stays a single, uniform-height line.
+  function branchTooltip(branch: Branch) {
+    const parts = [branch.current ? `${branch.name} (checked out)` : `Checkout ${branch.name}`];
+    if (branch.upstreamGone) parts.push(`${branch.upstream ?? "upstream"} · gone`);
+    else if (branch.upstream) parts.push(branch.upstream);
+    if (branch.ahead || branch.behind) parts.push(`↑${branch.ahead} ↓${branch.behind}`);
+    return parts.join(" — ");
+  }
+
   function isHeadRow(row: GraphRow) {
     return !!state && row.commit.shortHash === state.head;
   }
@@ -1076,6 +1088,7 @@
         <button title="Stash" on:click={() => execute({ kind: "stashCreate", message: "gitc stash" }, "Create stash")} disabled={busy}>▤<span>Stash</span></button>
         <button title="Terminal" on:click={openRepoTerminal} disabled={busy}>⌁<span>Terminal</span></button>
       </div>
+      <div class="toolbar-spacer"></div>
       <div class="search-actions">
         <button title="Actions" class:active={actionsOpen} on:click={() => (actionsOpen = !actionsOpen)}>☷<span>Actions</span></button>
         <button title="Search" on:click={() => (searchOpen = !searchOpen)}>⌕<span>Search</span></button>
@@ -1139,12 +1152,14 @@
                 {#if row.kind === "dir"}
                   <button class="ref-tree-dir" style={`--depth:${row.depth}`} on:click={() => (collapsedLocalDirs = toggleRefDir(collapsedLocalDirs, row.key))}>
                     <span class="tree-chevron">{collapsedLocalDirs.has(row.key) ? "▸" : "▾"}</span>
+                    <i class="tree-folder-icon">◫</i>
                     <span>{row.label}</span>
                   </button>
                 {:else}
                   <div class="branch-row" class:active={row.item.current} style={`--depth:${row.depth}`}>
                     <button
                       class="branch-name"
+                      title={branchTooltip(row.item)}
                       on:click={() => execute({ kind: "checkoutBranch", branch: row.item.name }, `Checkout ${row.item.name}`)}
                       disabled={busy || row.item.current}
                     >
@@ -1153,12 +1168,6 @@
                         <i class="branch-glyph">⑂</i>
                         <span>{row.label}</span>
                       </span>
-                      {#if row.item.upstream || row.item.upstreamGone}
-                        <small>
-                          {row.item.upstreamGone ? `${row.item.upstream ?? "upstream"} · gone` : row.item.upstream}
-                          {#if row.item.ahead || row.item.behind}↑{row.item.ahead} ↓{row.item.behind}{/if}
-                        </small>
-                      {/if}
                     </button>
                     {#if !row.item.current}
                       <button
@@ -1197,7 +1206,7 @@
                 {#if row.kind === "dir"}
                   <button class="ref-tree-dir" style={`--depth:${row.depth}`} on:click={() => (collapsedRemoteDirs = toggleRefDir(collapsedRemoteDirs, row.key))}>
                     <span class="tree-chevron">{collapsedRemoteDirs.has(row.key) ? "▸" : "▾"}</span>
-                    {#if row.depth === 0}<i class="tree-folder-icon">☁</i>{/if}
+                    <i class="tree-folder-icon">{row.depth === 0 ? "☁" : "◫"}</i>
                     <span>{row.label}</span>
                   </button>
                 {:else}
@@ -1693,25 +1702,30 @@
                 {/if}
               </div>
 
-              <div class="commit-actions">
-                <button on:click={() => commitDetail && execute({ kind: "checkoutCommit", target: commitDetail.hash }, `Checkout ${commitDetail.shortHash}`)} disabled={busy}>Checkout</button>
-                <button on:click={() => commitDetail && createBranchAtCommit(commitDetail.hash)} disabled={busy}>Branch</button>
-                <button on:click={() => commitDetail && createTagPrompt(commitDetail.hash)} disabled={busy}>Tag</button>
-                <button on:click={() => commitDetail && execute({ kind: "cherryPick", target: commitDetail.hash }, `Cherry-pick ${commitDetail.shortHash}`)} disabled={busy}>Cherry-pick</button>
-                <button on:click={() => commitDetail && execute({ kind: "revert", target: commitDetail.hash }, `Revert ${commitDetail.shortHash}`)} disabled={busy}>Revert</button>
-                <button on:click={() => commitDetail && openRebasePanel("plain", commitDetail.hash)} disabled={busy}>Rebase onto this</button>
-              </div>
-              <div class="reset-mode-row">
-                <label for="detail-reset-mode">reset mode</label>
-                <select id="detail-reset-mode" bind:value={resetMode}>
-                  <option value="soft">soft</option>
-                  <option value="mixed">mixed</option>
-                  <option value="hard">hard</option>
-                </select>
-                <button class="danger" on:click={() => commitDetail && execute({ kind: "reset", target: commitDetail.hash, mode: resetMode }, `Reset to ${commitDetail.shortHash}`)} disabled={busy}>
-                  Reset here
-                </button>
-              </div>
+              <details class="commit-actions-disclosure">
+                <summary>
+                  <span class="options-toggle"><i>›</i> Commit actions</span>
+                </summary>
+                <div class="commit-actions">
+                  <button on:click={() => commitDetail && execute({ kind: "checkoutCommit", target: commitDetail.hash }, `Checkout ${commitDetail.shortHash}`)} disabled={busy}>Checkout</button>
+                  <button on:click={() => commitDetail && createBranchAtCommit(commitDetail.hash)} disabled={busy}>Branch</button>
+                  <button on:click={() => commitDetail && createTagPrompt(commitDetail.hash)} disabled={busy}>Tag</button>
+                  <button on:click={() => commitDetail && execute({ kind: "cherryPick", target: commitDetail.hash }, `Cherry-pick ${commitDetail.shortHash}`)} disabled={busy}>Cherry-pick</button>
+                  <button on:click={() => commitDetail && execute({ kind: "revert", target: commitDetail.hash }, `Revert ${commitDetail.shortHash}`)} disabled={busy}>Revert</button>
+                  <button on:click={() => commitDetail && openRebasePanel("plain", commitDetail.hash)} disabled={busy}>Rebase onto this</button>
+                </div>
+                <div class="reset-mode-row">
+                  <label for="detail-reset-mode">reset mode</label>
+                  <select id="detail-reset-mode" bind:value={resetMode}>
+                    <option value="soft">soft</option>
+                    <option value="mixed">mixed</option>
+                    <option value="hard">hard</option>
+                  </select>
+                  <button class="danger" on:click={() => commitDetail && execute({ kind: "reset", target: commitDetail.hash, mode: resetMode }, `Reset to ${commitDetail.shortHash}`)} disabled={busy}>
+                    Reset here
+                  </button>
+                </div>
+              </details>
             </div>
           {:else}
             <p class="empty centered">Unable to load commit detail.</p>
@@ -1936,7 +1950,7 @@
           ? "Merge in progress"
           : state?.rebasing
             ? "Rebase in progress"
-            : selectedCommit?.shortHash ?? "Ready"}
+            : "Ready"}
     </span>
     <span>{currentBranch}</span>
   </footer>
