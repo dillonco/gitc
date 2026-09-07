@@ -945,7 +945,9 @@ small {
 .graph-area {
   /* Lane geometry lives here so pitch, dot size and column width stay in step. */
   --lane-pitch: 22px;
-  --lane-center: 35px;
+  /* 24px: half a 22px dot (11px) plus a 13px margin. 35px left a wide
+     empty run between the dot and the message on linear history. */
+  --lane-center: 24px;
   position: relative;
   grid-column: 2;
   grid-row: 3;
@@ -1159,7 +1161,7 @@ small {
 
 .graph-head {
   display: grid;
-  grid-template-columns: 140px minmax(96px, calc(39px + var(--lane-count, 1) * var(--lane-pitch, 22px))) minmax(240px, 1fr);
+  grid-template-columns: 140px minmax(52px, calc(19px + var(--lane-count, 1) * var(--lane-pitch, 22px))) minmax(240px, 1fr);
   height: 22px;
   background: var(--panel);
   color: var(--ink-dim);
@@ -1204,7 +1206,7 @@ small {
 .wip-row,
 .commit-row {
   display: grid;
-  grid-template-columns: 140px minmax(96px, calc(39px + var(--lane-count, 1) * var(--lane-pitch, 22px))) minmax(240px, 1fr);
+  grid-template-columns: 140px minmax(52px, calc(19px + var(--lane-count, 1) * var(--lane-pitch, 22px))) minmax(240px, 1fr);
   align-items: center;
   width: 100%;
   height: 28px;
