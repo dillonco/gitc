@@ -1560,7 +1560,6 @@
             </select>
             <div class="mini-actions">
               <button on:click={() => execute({ kind: "merge", target: commandTarget }, "Merge")} disabled={busy || !commandTarget.trim()}>Merge</button>
-              <button on:click={() => execute({ kind: "rebase", target: commandTarget }, "Rebase")} disabled={busy || !commandTarget.trim()}>Rebase</button>
               <button on:click={() => execute({ kind: "cherryPick", target: commandTarget }, "Cherry-pick")} disabled={busy || !commandTarget.trim()}>
                 Cherry-pick
               </button>
