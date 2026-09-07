@@ -1583,7 +1583,13 @@
             title={commitRowTitle(row)}
             on:click={(event) => handleCommitRowClick(event, row, rowIndex)}
           >
-            <span class="branch-cell" title={row.labels.join("  ")}>
+            <span
+              class="branch-cell"
+              class:linked={row.labels.length > 0}
+              class:head={isHeadRow(row)}
+              style={`--ref-color:${row.color}`}
+              title={row.labels.join("  ")}
+            >
               {#if row.labels.length}
                 <span class="ref-pill" class:head={isHeadRow(row) && row.labels[0] === currentBranch} style={`--ref-color:${row.color}`}>
                   {#if isHeadRow(row) && row.labels[0] === currentBranch}<i class="pill-check">✓</i>{/if}

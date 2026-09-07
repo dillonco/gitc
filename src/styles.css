@@ -1373,7 +1373,31 @@ small {
   white-space: nowrap;
 }
 
+/* Carries the connector from the last pill out to the column edge, where
+   .ref-link picks it up and runs on to the dot. flex:1 rather than a fixed
+   offset because the pills are content-sized and the +N chip is optional. */
+.branch-cell.linked::after {
+  content: "";
+  /* grow to fill, never shrink below a visible stub */
+  flex: 1 0 8px;
+  height: 1px;
+  background: color-mix(in srgb, var(--ref-color) 25%, #1c1e24);
+}
+
+.branch-cell.linked.head::after {
+  height: 2px;
+  background: var(--ref-color);
+}
+
 .branch-cell .ref-pill {
+  /* Shrinkable, because the 124px cap alone overflowed the 140px column
+     whenever a +N chip followed it (10 + 124 + 5 + 19 = 158). The label
+     already ellipsises, so the pill gives up width instead of clipping. */
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.branch-cell .more-pill {
   flex: none;
 }
 
