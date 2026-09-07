@@ -19,7 +19,7 @@
     --edge-soft: #2e3138;
     --ink: #c9cacb;
     --ink-bright: #eceded;
-    --ink-dim: #7e7f83;
+    --ink-dim: #8b8c90; /* 4.96:1 on --ground; the app's #7e7f83 is 4.17:1 */
     --lane-1: #14a0bf;
     --lane-2: #3b82f6;
     --lane-3: #8e00c2;
@@ -29,6 +29,20 @@
   }
 
   * { box-sizing: border-box; }
+
+  .skip {
+    position: absolute;
+    top: -100px;
+    left: 16px;
+    z-index: 10;
+    border-radius: var(--radius);
+    background: var(--panel);
+    padding: 10px 14px;
+    color: var(--ink-bright);
+    font-family: var(--mono);
+    font-size: 13px;
+  }
+  .skip:focus { top: 16px; }
 
   html { -webkit-text-size-adjust: 100%; }
 
@@ -134,6 +148,10 @@
     width: 100%;
     height: auto;
   }
+  .shot { overflow-x: auto; }
+  @media (max-width: 640px) {
+    .shot img { width: auto; min-width: 620px; max-width: none; }
+  }
   figcaption {
     border-top: 1px solid var(--edge);
     padding: 9px 14px;
@@ -235,10 +253,14 @@
   footer a:hover { color: var(--lane-1); }
 
   @media (max-width: 720px) {
-    header.hero { padding-top: 64px; }
-    section { padding: 60px 0; }
+    header.hero { padding-top: 56px; }
+    section { padding: 56px 0; }
+    .wrap { padding: 0 18px; }
+    .lede { font-size: 17px; }
     dl.sheet { grid-template-columns: 1fr; }
     dl.sheet dt { border-bottom: 0; padding-bottom: 0; }
+    .stat { flex-wrap: wrap; gap: 8px 14px; }
+    .stat b { font-size: 29px; }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -247,6 +269,8 @@
 </style>
 </head>
 <body>
+
+<a class="skip" href="#clean-up">Skip to content</a>
 
 <header class="hero">
   <div class="wrap">
@@ -258,17 +282,17 @@
       <span><b>170</b> tests</span>
       <span>no Electron</span>
     </p>
-    <figure>
+    <figure class="shot">
       <img src="./shots/graph.png" alt="The gitc window: branch tree on the left, commit graph with coloured lanes in the middle, commit detail on the right." width="1400" />
     </figure>
   </div>
 </header>
 
-<section>
+<section id="clean-up" aria-labelledby="clean-up-h">
   <div class="wrap">
     <p class="eyebrow"><span class="rail"></span>Clean up</p>
     <div class="col">
-      <h2>The branches git won't delete</h2>
+      <h2 id="clean-up-h">The branches git won't delete</h2>
       <p><code>git branch --merged</code> can't see a squash merge. The commits are on main, the branch isn't an ancestor of it, and <code>-d</code> refuses.</p>
       <p>gitc checks whether the branch's tree is already reachable, so squash-merged work shows up next to the ordinary kind — with what's gone from the remote, and what nobody has touched in a month.</p>
       <div class="stat">
@@ -276,42 +300,45 @@
         <span>branches on one repo here were already merged. <code>--merged</code> listed none of them.</span>
       </div>
     </div>
-    <figure>
-      <img src="./shots/cleanup.gif" alt="Opening the cleanup panel: branches grouped as merged, squash-merged, upstream gone, stale and active, with a running count of what is selected." width="1400" loading="lazy" />
+    <figure class="shot">
+      <picture>
+        <source srcset="./shots/cleanup.png" media="(prefers-reduced-motion: reduce)" />
+        <img src="./shots/cleanup.gif" alt="Opening the cleanup panel: branches grouped as merged, squash-merged, upstream gone, stale and active, with a running count of what is selected." width="1400" loading="lazy" />
+      </picture>
       <figcaption>Grouped by why they're safe. Force-deletes are counted separately before you commit to anything.</figcaption>
     </figure>
   </div>
 </section>
 
-<section>
+<section id="stage" aria-labelledby="stage-h">
   <div class="wrap">
     <p class="eyebrow two"><span class="rail"></span>Stage</p>
     <div class="col">
-      <h2>Hunk at a time</h2>
+      <h2 id="stage-h">Hunk at a time</h2>
       <p>Stage, unstage or discard a single hunk. Side-by-side or unified, blame and history on the same file without leaving it.</p>
     </div>
-    <figure>
+    <figure class="shot">
       <img src="./shots/diff.png" alt="A file diff in gitc with line numbers, added and removed lines, and stage or discard controls for the hunk." width="1400" loading="lazy" />
     </figure>
   </div>
 </section>
 
-<section>
+<section id="rewrite" aria-labelledby="rewrite-h">
   <div class="wrap">
     <p class="eyebrow three"><span class="rail"></span>Rewrite</p>
     <div class="col">
-      <h2>Rebase without the todo file</h2>
+      <h2 id="rewrite-h">Rebase without the todo file</h2>
       <p>Reorder, squash, fixup, reword, drop. Conflicts drop into the same merge editor as everything else, and <code>ORIG_HEAD</code> is one button away if you don't like the result.</p>
       <p class="note">Interactive rebase is experimental. It needs a clean tree, and it doesn't do <code>edit</code>, <code>break</code> or autosquash yet.</p>
     </div>
   </div>
 </section>
 
-<section>
+<section id="build" aria-labelledby="build-h">
   <div class="wrap">
     <p class="eyebrow"><span class="rail"></span>Build</p>
     <div class="col">
-      <h2>What's in it</h2>
+      <h2 id="build-h">What's in it</h2>
     </div>
     <dl class="sheet">
       <dt>Core</dt>
