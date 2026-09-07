@@ -1079,19 +1079,49 @@
         <strong>{currentBranch}</strong>
       </div>
       <div class="top-actions">
-        <button title="Refresh" on:click={refresh} disabled={busy}>↻<span>Refresh</span></button>
-        <button title="Fetch" on:click={() => execute({ kind: "fetch" }, "Fetch")} disabled={busy}>⇣<span>Fetch</span></button>
-        <button title="Pull" on:click={() => execute({ kind: "pull" }, "Pull")} disabled={busy}>⇩<span>Pull</span></button>
-        <button title="Push" on:click={() => execute({ kind: "push" }, "Push")} disabled={busy}>⇧<span>Push</span></button>
-        <button title="Branch" on:click={createBranchFromToolbar}>⑂<span>Branch</span></button>
-        <button title="Compare refs (shift-click two commits in the graph)" on:click={() => openCompare(null, currentBranch)}>⇄<span>Compare</span></button>
-        <button title="Stash" on:click={() => execute({ kind: "stashCreate", message: "gitc stash" }, "Create stash")} disabled={busy}>▤<span>Stash</span></button>
-        <button title="Terminal" on:click={openRepoTerminal} disabled={busy}>⌁<span>Terminal</span></button>
+        <button title="Refresh" on:click={refresh} disabled={busy}>
+          <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6" /><path d="M1 20v-6h6" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10" /><path d="M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></svg>
+          <span>Refresh</span>
+        </button>
+        <button title="Fetch" on:click={() => execute({ kind: "fetch" }, "Fetch")} disabled={busy}>
+          <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+          <span>Fetch</span>
+        </button>
+        <button title="Pull" on:click={() => execute({ kind: "pull" }, "Pull")} disabled={busy}>
+          <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><polyline points="19 12 12 19 5 12" /></svg>
+          <span>Pull</span>
+        </button>
+        <button title="Push" on:click={() => execute({ kind: "push" }, "Push")} disabled={busy}>
+          <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" /></svg>
+          <span>Push</span>
+        </button>
+        <button title="Branch" on:click={createBranchFromToolbar}>
+          <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15" /><circle cx="18" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><path d="M18 9a9 9 0 0 1-9 9" /></svg>
+          <span>Branch</span>
+        </button>
+        <button title="Compare refs (shift-click two commits in the graph)" on:click={() => openCompare(null, currentBranch)}>
+          <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /></svg>
+          <span>Compare</span>
+        </button>
+        <button title="Stash" on:click={() => execute({ kind: "stashCreate", message: "gitc stash" }, "Create stash")} disabled={busy}>
+          <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8" /><rect x="1" y="3" width="22" height="5" /><line x1="10" y1="12" x2="14" y2="12" /></svg>
+          <span>Stash</span>
+        </button>
+        <button title="Terminal" on:click={openRepoTerminal} disabled={busy}>
+          <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5" /><line x1="12" y1="19" x2="20" y2="19" /></svg>
+          <span>Terminal</span>
+        </button>
       </div>
       <div class="toolbar-spacer"></div>
       <div class="search-actions">
-        <button title="Actions" class:active={actionsOpen} on:click={() => (actionsOpen = !actionsOpen)}>☷<span>Actions</span></button>
-        <button title="Search" on:click={() => (searchOpen = !searchOpen)}>⌕<span>Search</span></button>
+        <button title="Actions" class:active={actionsOpen} on:click={() => (actionsOpen = !actionsOpen)}>
+          <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14" /><line x1="4" y1="10" x2="4" y2="3" /><line x1="12" y1="21" x2="12" y2="12" /><line x1="12" y1="8" x2="12" y2="3" /><line x1="20" y1="21" x2="20" y2="16" /><line x1="20" y1="12" x2="20" y2="3" /><line x1="1" y1="14" x2="7" y2="14" /><line x1="9" y1="8" x2="15" y2="8" /><line x1="17" y1="16" x2="23" y2="16" /></svg>
+          <span>Actions</span>
+        </button>
+        <button title="Search" on:click={() => (searchOpen = !searchOpen)}>
+          <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+          <span>Search</span>
+        </button>
         {#if actionsOpen}
           <div class="dropdown-menu" role="menu">
             <button on:click={() => execute({ kind: "fetchAll" }, "Fetch all remotes")}>Fetch All &amp; Prune</button>
@@ -1513,30 +1543,32 @@
         </span>
       </div>
       <div class="graph-scroll">
-        <div class="wip-row">
-          <div class="branch-cell"></div>
-          <div class="wip-graph">
-            <span class="wip-rail"></span>
-            <span class="wip-node"></span>
+        {#if totalChanges > 0}
+          <div class="wip-row">
+            <div class="branch-cell"></div>
+            <div class="wip-graph">
+              <span class="wip-rail"></span>
+              <span class="wip-node"></span>
+            </div>
+            <div class="wip-summary">
+              <button class="wip-message" on:click={() => selectCommit(null)}>
+                <strong>// WIP</strong>
+              </button>
+              {#if wipModified || wipAdded}
+                <span class="wip-count" title={`${totalChanges} WIP file changes`}>
+                  {#if wipModified}
+                    <span class="wip-pencil">✎</span>
+                    <strong>{wipModified}</strong>
+                  {/if}
+                  {#if wipAdded}
+                    <span class="wip-added">+</span>
+                    <strong>{wipAdded}</strong>
+                  {/if}
+                </span>
+              {/if}
+            </div>
           </div>
-          <div class="wip-summary">
-            <button class="wip-message" on:click={() => selectCommit(null)}>
-              <strong>// WIP</strong>
-            </button>
-            {#if wipModified || wipAdded}
-              <span class="wip-count" title={`${totalChanges} WIP file changes`}>
-                {#if wipModified}
-                  <span class="wip-pencil">✎</span>
-                  <strong>{wipModified}</strong>
-                {/if}
-                {#if wipAdded}
-                  <span class="wip-added">+</span>
-                  <strong>{wipAdded}</strong>
-                {/if}
-              </span>
-            {/if}
-          </div>
-        </div>
+        {/if}
         {#each visibleGraphRows as row, rowIndex}
           <button
             class="commit-row"
@@ -1736,7 +1768,7 @@
             on:click={() => selectedFile && execute({ kind: selectedFile.group === "untracked" ? "cleanUntracked" : "discard", path: selectedFile.path }, "Discard selected file")}
             disabled={!selectedFile}
           >⌫</button>
-          <strong>{totalChanges} file changes on <span>{currentBranch}</span></strong>
+          <strong><span class="changes-title-label">{totalChanges} file changes on</span> <span class="changes-title-branch">{currentBranch}</span></strong>
           <button class="refresh-btn" title="Refresh" on:click={refresh} disabled={busy}>↻</button>
         </div>
         <div class="changes-tools">
