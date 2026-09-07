@@ -592,6 +592,11 @@ mod tests {
             &std::env::temp_dir(),
             &["clone", origin.path().to_str().unwrap(), clone_path.to_str().unwrap()],
         );
+        // A fresh clone inherits no identity from the source repository, and CI
+        // has no global git config, so configure it the way `TempRepo` does.
+        run(&clone_path, &["config", "user.email", "test@gitc.dev"]);
+        run(&clone_path, &["config", "user.name", "Test User"]);
+        run(&clone_path, &["config", "commit.gpgsign", "false"]);
         run(&clone_path, &["checkout", "-b", "feature/gone"]);
         write_file(&clone_path, "b.txt", "1\n");
         commit_all(&clone_path, "feature commit");
