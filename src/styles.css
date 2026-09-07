@@ -277,7 +277,11 @@ p {
 .repo-bar {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: 160px 220px minmax(0, 1fr) 180px;
+  /* The branch name gets the flexible track (it's the thing that actually
+     needs the room); the toolbar button groups size to their own content
+     instead of claiming a wide track and centering inside it with the
+     branch name left to truncate in a comparatively narrow fixed column. */
+  grid-template-columns: 160px minmax(160px, 1fr) max-content max-content;
   border-bottom: 1px solid var(--chrome-edge);
   background: var(--chrome);
 }
@@ -348,9 +352,15 @@ p {
 
 .top-actions button,
 .search-actions button {
-  display: grid;
-  align-content: center;
-  justify-items: center;
+  /* column-reverse (not grid's DOM order) puts the label above the icon,
+     matching the reference, without reordering the markup: the icon is a
+     bare glyph character and the label a trailing <span>, so the last DOM
+     child (the label) becomes the first visual row. */
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
   min-width: 62px;
   border-left: 1px solid transparent;
   border-radius: 0;
@@ -387,13 +397,25 @@ p {
 }
 
 .nav-scroll {
+  display: flex;
   flex: 1;
+  flex-direction: column;
   min-height: 0;
   overflow-y: auto;
 }
 
+/* Rendered once, right after whichever section is open last, so the
+   sections after it collect at the sidebar's bottom edge instead of the
+   empty space always landing below everything (App.svelte's
+   lastOpenNavIndex picks where this goes; with nothing open it isn't
+   rendered at all, so collapsed sections just stack at the top). */
+.nav-spacer {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 .viewing-row {
-  padding: 14px 7px 0;
+  padding: 12px 8px 6px;
   color: var(--ink);
   font-size: 13px;
 }
@@ -406,7 +428,8 @@ p {
 .filter-block {
   display: grid;
   gap: 8px;
-  padding: 8px 3px;
+  border-bottom: 1px solid var(--edge);
+  padding: 0 8px 10px;
   color: var(--ink);
   font-size: 13px;
 }
@@ -498,7 +521,9 @@ p {
   justify-items: start;
   min-width: 0;
   min-height: 28px;
-  padding: 0 8px 0 39px;
+  /* --depth comes from buildRefTree()'s folder nesting (branch names split
+     on "/"), so a leaf inside a folder indents further than a top-level one. */
+  padding: 0 8px 0 calc(23px + var(--depth, 0) * 16px);
   background: transparent;
   border-radius: 0;
   font-size: 13px;
@@ -515,6 +540,67 @@ p {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.branch-name-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+
+.branch-check {
+  display: inline-grid;
+  flex: none;
+  width: 13px;
+  height: 13px;
+  place-items: center;
+  border-radius: 3px;
+  background: var(--green-border);
+  color: #0d1c10;
+  font-size: 9px;
+  font-style: normal;
+}
+
+.branch-glyph {
+  flex: none;
+  color: var(--ink-dim);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.ref-tree-dir {
+  display: flex;
+  width: 100%;
+  min-height: 28px;
+  align-items: center;
+  gap: 6px;
+  border-radius: 0;
+  background: transparent;
+  padding: 0 8px 0 calc(16px + var(--depth, 0) * 16px);
+  color: var(--ink-label);
+  font-size: 13px;
+  font-weight: 400;
+  text-align: left;
+}
+
+.ref-tree-dir:hover:not(:disabled) {
+  border-color: transparent;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.ref-tree-dir .tree-chevron {
+  flex: none;
+  width: 8px;
+  color: var(--ink-label);
+  font-size: 9px;
+}
+
+.ref-tree-dir .tree-folder-icon {
+  flex: none;
+  color: var(--ink-dim);
+  font-size: 11px;
+  font-style: normal;
 }
 
 .branch-row {
@@ -541,10 +627,12 @@ p {
   opacity: 1;
 }
 
+/* The checked-out branch reads green in the reference, not the generic
+   selection blue used for active rows elsewhere. */
 .branch-row.active .branch-name {
   border-color: transparent;
-  background: var(--select);
-  color: #ffffff;
+  background: var(--green-fill);
+  color: var(--green-text);
 }
 
 .branch-row.active .branch-name:disabled {
@@ -553,7 +641,7 @@ p {
 }
 
 .branch-row.active .branch-name small {
-  color: #bfeee2;
+  color: var(--green-border);
 }
 
 .stash-row {
@@ -998,7 +1086,7 @@ small {
 
 .graph-head {
   display: grid;
-  grid-template-columns: 140px minmax(96px, calc(39px + var(--lane-count, 3) * var(--lane-pitch, 22px))) minmax(240px, 1fr);
+  grid-template-columns: 140px minmax(96px, calc(39px + var(--lane-count, 1) * var(--lane-pitch, 22px))) minmax(240px, 1fr);
   height: 22px;
   background: var(--panel);
   color: var(--ink-dim);
@@ -1016,8 +1104,11 @@ small {
 }
 
 .graph-head span:last-child {
+  /* .graph-scroll below has its own 8px scrollbar that the header (which
+     never scrolls) doesn't reserve space for on its own; without this the
+     gear sits where the scrollbar thumb renders one row down. */
   border-right: 0;
-  padding-right: 4px;
+  padding-right: 12px;
 }
 
 .graph-settings {
@@ -1040,10 +1131,11 @@ small {
 .wip-row,
 .commit-row {
   display: grid;
-  grid-template-columns: 140px minmax(96px, calc(39px + var(--lane-count, 3) * var(--lane-pitch, 22px))) minmax(240px, 1fr);
+  grid-template-columns: 140px minmax(96px, calc(39px + var(--lane-count, 1) * var(--lane-pitch, 22px))) minmax(240px, 1fr);
   align-items: center;
   width: 100%;
   height: 28px;
+  position: relative;
 }
 
 .wip-row {
@@ -1194,7 +1286,12 @@ small {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  width: 96px;
+  /* Sized to the label, not a fixed 96px — a real branch name like
+     "style/graph-sidebar-match" or "origin/main" got truncated to
+     "style/gr…" for no reason when there was room to give it. Still capped
+     so one long name can't push the +N chip out of the branch column. */
+  width: max-content;
+  max-width: 124px;
   height: 22px;
   overflow: hidden;
   border: 0;
@@ -1348,6 +1445,7 @@ small {
 }
 
 .commit-main {
+  position: relative;
   display: grid;
   min-width: 0;
   align-self: stretch;
@@ -1370,23 +1468,55 @@ small {
   font-weight: 400;
 }
 
-.commit-main strong span,
-.commit-main strong em {
+.commit-main strong span {
   overflow: hidden;
+  flex: 0 1 auto;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.commit-main strong span {
-  flex: 0 1 auto;
-}
-
-.commit-main strong em {
+/* The dimmed summary used to shrink continuously with flex:1 1 0 down to
+   a couple of characters plus an ellipsis, which read as noise ("C…").
+   A container query gives it a hard cutoff instead: the wrapper still
+   shrinks continuously (it's the flex item), but the <em> inside it only
+   renders once the wrapper actually has room to say something. */
+.commit-summary {
+  container-type: inline-size;
   flex: 1 1 0;
   min-width: 0;
+  overflow: hidden;
+}
+
+.commit-summary em {
+  display: none;
+  overflow: hidden;
   color: var(--ink-body-dim);
   font-style: normal;
   font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@container (min-width: 56px) {
+  .commit-summary em {
+    display: block;
+  }
+}
+
+.date-marker {
+  position: absolute;
+  top: 0;
+  right: 7px;
+  z-index: 4;
+  transform: translateY(-50%);
+  border-radius: var(--radius);
+  background: #34363d;
+  padding: 2px 8px;
+  color: var(--ink-label);
+  font-size: 11px;
+  font-weight: 400;
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 .commit-main small {
@@ -1840,15 +1970,15 @@ small {
   font-size: 13px;
 }
 
-.file-name span.st-add {
+.st-add {
   color: var(--green-border);
 }
 
-.file-name span.st-mod {
+.st-mod {
   color: var(--amber);
 }
 
-.file-name span.st-del {
+.st-del {
   color: var(--red-border);
 }
 
@@ -2284,49 +2414,113 @@ summary::-webkit-details-marker {
   padding-left: calc(8px + var(--depth, 0) * 16px);
 }
 
+/* Every level between the 351px-wide .right-panel and the commit body text
+   needs min-width: 0 — grid/flex items default to min-width: auto (their
+   content's min-content size), so a long unbreakable token in the commit
+   body (e.g. a session URL) would otherwise force this whole chain wider
+   than the panel, and .right-panel's overflow: hidden clips the excess at
+   the panel's right edge instead of wrapping it. */
 .commit-detail {
   display: grid;
   grid-row: 1 / -1;
-  grid-template-rows: 48px minmax(0, 1fr);
+  grid-template-rows: 40px minmax(0, 1fr);
+  min-width: 0;
   min-height: 0;
   overflow: hidden;
 }
 
+.commit-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  height: 40px;
+  border-bottom: 1px solid var(--edge);
+  padding: 0 8px 0 12px;
+}
+
+.commit-hash-btn {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 4px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--ink-dim);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.commit-hash-btn strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commit-detail-close {
+  flex: none;
+  width: 22px;
+  min-height: 22px;
+  border: 0;
+  padding: 0;
+  color: var(--ink-dim);
+  font-size: 15px;
+  line-height: 1;
+}
+
 .commit-detail-scroll {
+  min-width: 0;
   min-height: 0;
   overflow-y: auto;
-  padding: 14px 12px;
+  padding: 12px;
 }
 
-.commit-meta {
-  display: grid;
-  gap: 8px;
-  border-bottom: 1px solid var(--edge);
-  padding-bottom: 14px;
+.commit-message-card {
+  min-width: 0;
+  border: 1px solid var(--edge);
+  border-radius: 3px;
+  background: var(--input-bg);
+  padding: 12px 13px;
 }
 
-.commit-meta h2 {
+.commit-message-card h2 {
+  min-width: 0;
+  overflow-wrap: anywhere;
   color: #e8ecf1;
-  font-size: 16px;
-  line-height: 1.35;
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.commit-body-scroll {
+  min-width: 0;
+  max-height: 100px;
+  margin-top: 10px;
+  overflow-y: auto;
 }
 
 .commit-body {
-  color: var(--ink);
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--ink-body-dim);
   font-size: 13px;
   line-height: 1.5;
-  white-space: pre-wrap;
+  /* pre-line (not pre-wrap): preserves the real line breaks App.svelte's
+     reflowCommitBody() left in place (bullets, trailers, paragraph gaps)
+     and lets the browser wrap everything else naturally at the panel's
+     width, instead of preserving git's ~72-column hard wraps verbatim. */
+  white-space: pre-line;
 }
 
-.commit-meta-line {
+.commit-author-row {
   display: flex;
-  align-items: center;
+  min-width: 0;
+  align-items: flex-start;
   gap: 10px;
-}
-
-.commit-meta-line div {
-  display: grid;
-  gap: 1px;
+  padding: 10px 2px 0;
 }
 
 .author-badge {
@@ -2337,16 +2531,72 @@ summary::-webkit-details-marker {
   place-items: center;
   border: 2px solid var(--teal);
   border-radius: 50%;
-  background: rgba(110, 168, 254, 0.10);
+  background: rgba(110, 168, 254, 0.1);
   color: #e8ecf1;
   font-size: 10px;
   font-weight: 650;
+}
+
+.commit-author-main {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.commit-author-main strong {
+  overflow: hidden;
+  color: #e8ecf1;
+  font-size: 15px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commit-author-main small {
+  color: var(--ink-dim);
+  font-size: 12px;
+}
+
+.commit-parent {
+  flex: none;
+  margin-left: auto;
+  color: var(--ink-dim);
+  font-size: 12px;
+  text-align: right;
+}
+
+.commit-parent strong {
+  margin-left: 4px;
+  color: var(--ink);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-weight: 500;
 }
 
 .detail-refs {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
+  padding: 8px 2px 0;
+}
+
+.commit-change-summary {
+  /* Plain inline flow, not flex — flex's `gap` would space every child
+     evenly, including the bare "2 modified" text node, which shoves the
+     trailing comma away from the word it follows. */
+  padding: 10px 2px 0;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.commit-change-summary .st-mod,
+.commit-change-summary .st-add,
+.commit-change-summary .st-del {
+  margin-right: 2px;
+}
+
+.commit-change-summary .summary-sep {
+  margin-right: 4px;
+  color: var(--ink-dim);
 }
 
 .commit-actions {
@@ -2384,63 +2634,46 @@ summary::-webkit-details-marker {
 
 .commit-files {
   display: grid;
-  gap: 2px;
+  min-width: 0;
+  gap: 0;
   border-top: 1px solid var(--edge);
-  padding-top: 12px;
-}
-
-.commit-files h3 {
-  margin: 0 0 8px;
-  color: var(--ink);
-  font-size: 13px;
-  font-weight: 650;
+  margin-top: 6px;
+  padding-top: 4px;
 }
 
 .commit-file-row {
   display: grid;
-  grid-template-columns: 22px minmax(0, 1fr);
+  grid-template-columns: 32px minmax(0, 1fr);
   align-items: center;
-  gap: 8px;
-  min-height: 30px;
-  padding: 0 6px;
+  min-width: 0;
+  height: 30px;
+  padding: 0;
   text-align: left;
 }
 
 .commit-file-row.active {
-  background: rgba(110, 168, 254, 0.14);
-  border-color: rgba(110, 168, 254, 0.30);
+  background: var(--select);
+}
+
+.commit-file-row.tree-row {
+  padding-left: calc(8px + var(--depth, 0) * 16px);
+}
+
+.commit-file-row span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 400;
 }
 
 .commit-file-row strong {
   overflow: hidden;
-  color: #e8ecf1;
+  color: var(--ink);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 400;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.commit-file-row span {
-  font-family: "SFMono-Regular", Consolas, monospace;
-  font-weight: 650;
-  text-align: center;
-}
-
-.status-a {
-  color: #8be34b;
-}
-
-.status-m {
-  color: #f5d547;
-}
-
-.status-d {
-  color: #ff8b8b;
-}
-
-.status-r,
-.status-c {
-  color: var(--teal);
 }
 
 .modal-backdrop {
@@ -2584,7 +2817,7 @@ summary::-webkit-details-marker {
   }
 
   .repo-bar {
-    grid-template-columns: 140px 180px minmax(0, 1fr) 150px;
+    grid-template-columns: 140px minmax(140px, 1fr) max-content max-content;
   }
 
   .top-actions button,

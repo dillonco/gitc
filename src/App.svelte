@@ -127,6 +127,9 @@
   let stashesOpen = false;
   let tagsOpen = false;
   let worktreesOpen = false;
+  let collapsedLocalDirs = new Set<string>();
+  let collapsedRemoteDirs = new Set<string>();
+  let collapsedCommitDirs = new Set<string>();
   let cleanupOpen = false;
   let unstagedOpen = true;
   let stagedOpen = true;
@@ -192,9 +195,32 @@
   $: hunkRows = diffRows.map((row, index) => ({ row, index })).filter((item) => item.row.kind === "hunk");
   $: graphRows = buildGraphRows(commits);
   $: visibleGraphRows = filterGraphRows(graphRows, searchOpen ? searchQuery : "");
-  $: graphLaneCount = Math.max(3, ...graphRows.flatMap((row) => row.lanes.map((lane) => lane.index + 1)), 1);
+  // No artificial floor: a linear repo has one lane, and the graph column
+  // should be sized for the lanes the data actually has, not padded for
+  // lanes that don't exist (was Math.max(3, ...), wasting column width).
+  $: graphLaneCount = Math.max(1, ...graphRows.flatMap((row) => row.lanes.map((lane) => lane.index + 1)));
   $: filteredBranches = (state?.branches ?? []).filter(
     (branch) => !searchQuery.trim() || branch.name.toLowerCase().includes(searchQuery.trim().toLowerCase()),
+  );
+  $: commitFileSummaryParts = commitDetail
+    ? (
+        [
+          { key: "modified", cls: "st-mod", glyph: "✎", count: commitDetail.files.filter((f) => !/^[AD?]/.test(f.status)).length },
+          { key: "added", cls: "st-add", glyph: "+", count: commitDetail.files.filter((f) => /^[A?]/.test(f.status)).length },
+          { key: "deleted", cls: "st-del", glyph: "−", count: commitDetail.files.filter((f) => /^D/.test(f.status)).length },
+        ] as const
+      ).filter((part) => part.count > 0)
+    : [];
+  $: sortedCommitFiles = commitDetail ? sortByPath(commitDetail.files, sortAsc) : [];
+  $: commitFileTree = commitDetail ? buildRefTree(sortedCommitFiles, (file) => file.path, collapsedCommitDirs) : [];
+  $: localTree = buildRefTree(filteredBranches, (branch) => branch.name, collapsedLocalDirs);
+  $: remoteTree = buildRefTree(filteredRemoteBranches, (name) => name, collapsedRemoteDirs);
+  // Sections after the last expanded one stack at the sidebar's bottom edge
+  // (matching the reference), so the empty space collects between the open
+  // section's content and the collapsed remainder instead of below everything.
+  $: lastOpenNavIndex = [localOpen, remoteOpen, worktreesOpen, stashesOpen, tagsOpen].reduce(
+    (last, open, index) => (open ? index : last),
+    -1,
   );
   $: filteredRemoteBranches = (state?.remoteBranches ?? []).filter(
     (branch) => !searchQuery.trim() || branch.toLowerCase().includes(searchQuery.trim().toLowerCase()),
@@ -576,14 +602,104 @@
   }
 
   function authorInitials(author: string) {
-    return (
-      author
-        .split(/\s+/)
-        .filter(Boolean)
+    const parts = author.trim().split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      return parts
         .slice(0, 2)
         .map((part) => part[0]?.toUpperCase())
-        .join("") || "G"
-    );
+        .join("");
+    }
+    const word = parts[0];
+    if (!word) return "G";
+    // A single-word author (the common case for a solo repo) still gets two
+    // letters, e.g. "Dillon" -> "Di", instead of a single dot-everywhere "D".
+    return word.length > 1 ? word[0].toUpperCase() + word[1].toLowerCase() : word[0].toUpperCase();
+  }
+
+  // Git wraps a manually-authored commit body at ~72 columns for terminal
+  // reading; rendering those hard breaks verbatim inside a ~320px-wide panel
+  // re-wraps them again and shreds the paragraph into short fragments. This
+  // reflows each paragraph's wrapped lines back together (a line is a
+  // continuation unless it starts a bullet/numbered item or looks like a
+  // trailer such as "Co-Authored-By: ..."), so the browser can wrap the
+  // result naturally at the panel's real width. Blank lines still separate
+  // paragraphs; bullets and trailers still get their own line.
+  function reflowCommitBody(raw: string) {
+    if (!raw) return "";
+    return raw
+      .replace(/\r\n/g, "\n")
+      .split(/\n{2,}/)
+      .map((paragraph) => {
+        const groups: string[] = [];
+        for (const rawLine of paragraph.split("\n")) {
+          const line = rawLine.trim();
+          if (!line) continue;
+          const isBullet = /^([-*•]|\d+[.)])\s+/.test(line);
+          const isTrailer = /^[A-Za-z][\w .()/'-]*:\s/.test(line);
+          if (groups.length && !isBullet && !isTrailer) {
+            groups[groups.length - 1] += ` ${line}`;
+          } else {
+            groups.push(line);
+          }
+        }
+        return groups.join("\n");
+      })
+      .join("\n\n");
+  }
+
+  type RefTreeDirRow = { key: string; depth: number; kind: "dir"; label: string };
+  type RefTreeLeafRow<T> = { key: string; depth: number; kind: "leaf"; label: string; item: T };
+  type RefTreeRow<T> = RefTreeDirRow | RefTreeLeafRow<T>;
+
+  // Branch names like "style/graph-sidebar-match" render as a folder tree
+  // (split on "/"), matching the reference — not a flat list of full names.
+  function buildRefTree<T>(items: T[], pathOf: (item: T) => string, collapsed: Set<string>): RefTreeRow<T>[] {
+    type Node = { dirs: Map<string, Node>; leaves: T[] };
+    const root: Node = { dirs: new Map(), leaves: [] };
+    for (const item of items) {
+      const parts = pathOf(item).split("/");
+      let node = root;
+      for (const part of parts.slice(0, -1)) {
+        if (!node.dirs.has(part)) node.dirs.set(part, { dirs: new Map(), leaves: [] });
+        node = node.dirs.get(part)!;
+      }
+      node.leaves.push(item);
+    }
+    const rows: RefTreeRow<T>[] = [];
+    const walk = (node: Node, prefix: string, depth: number) => {
+      for (const [segment, child] of [...node.dirs.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+        const key = prefix ? `${prefix}/${segment}` : segment;
+        rows.push({ key, depth, kind: "dir", label: segment });
+        if (!collapsed.has(key)) walk(child, key, depth + 1);
+      }
+      for (const item of [...node.leaves].sort((a, b) => pathOf(a).localeCompare(pathOf(b)))) {
+        const path = pathOf(item);
+        const segment = path.split("/").at(-1) ?? path;
+        rows.push({ key: `${path}:leaf`, depth, kind: "leaf", label: segment, item });
+      }
+    };
+    walk(root, "", 0);
+    return rows;
+  }
+
+  function toggleRefDir(collapsed: Set<string>, key: string) {
+    const next = new Set(collapsed);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    return next;
+  }
+
+  function commitStatusGlyph(status: string): { glyph: string; cls: string } {
+    const code = status[0]?.toUpperCase();
+    if (code === "A" || code === "?") return { glyph: "+", cls: "st-add" };
+    if (code === "D") return { glyph: "−", cls: "st-del" };
+    if (code === "R" || code === "C") return { glyph: "⇝", cls: "st-mod" };
+    return { glyph: "✎", cls: "st-mod" };
+  }
+
+  function sortByPath<T extends { path: string }>(items: T[], asc: boolean) {
+    const sorted = [...items].sort((a, b) => a.path.localeCompare(b.path));
+    return asc ? sorted : sorted.reverse();
   }
 
   function isHeadRow(row: GraphRow) {
@@ -1019,40 +1135,54 @@
           </div>
           {#if localOpen}
             <div class="branch-list">
-              {#each filteredBranches as branch}
-                <div class="branch-row" class:active={branch.current}>
-                  <button
-                    class="branch-name"
-                    on:click={() => execute({ kind: "checkoutBranch", branch: branch.name }, `Checkout ${branch.name}`)}
-                    disabled={busy || branch.current}
-                  >
-                    <span>{branch.current ? "✓" : " "} {branch.name}</span>
-                    {#if branch.upstream || branch.upstreamGone}
-                      <small>
-                        {branch.upstreamGone ? `${branch.upstream ?? "upstream"} · gone` : branch.upstream}
-                        {#if branch.ahead || branch.behind}↑{branch.ahead} ↓{branch.behind}{/if}
-                      </small>
-                    {/if}
+              {#each localTree as row (row.key)}
+                {#if row.kind === "dir"}
+                  <button class="ref-tree-dir" style={`--depth:${row.depth}`} on:click={() => (collapsedLocalDirs = toggleRefDir(collapsedLocalDirs, row.key))}>
+                    <span class="tree-chevron">{collapsedLocalDirs.has(row.key) ? "▸" : "▾"}</span>
+                    <span>{row.label}</span>
                   </button>
-                  {#if !branch.current}
+                {:else}
+                  <div class="branch-row" class:active={row.item.current} style={`--depth:${row.depth}`}>
                     <button
-                      class="row-action"
-                      title={`Rebase ${currentBranch} onto ${branch.name}`}
-                      on:click={() => rebaseOnto(branch.name)}
-                      disabled={busy}
-                    >⤴</button>
-                    <button
-                      class="row-action danger"
-                      title={`Delete ${branch.name}`}
-                      on:click={() => deleteBranch(branch.name)}
-                      disabled={busy}
-                    >×</button>
-                  {/if}
-                </div>
+                      class="branch-name"
+                      on:click={() => execute({ kind: "checkoutBranch", branch: row.item.name }, `Checkout ${row.item.name}`)}
+                      disabled={busy || row.item.current}
+                    >
+                      <span class="branch-name-line">
+                        {#if row.item.current}<i class="branch-check">✓</i>{/if}
+                        <i class="branch-glyph">⑂</i>
+                        <span>{row.label}</span>
+                      </span>
+                      {#if row.item.upstream || row.item.upstreamGone}
+                        <small>
+                          {row.item.upstreamGone ? `${row.item.upstream ?? "upstream"} · gone` : row.item.upstream}
+                          {#if row.item.ahead || row.item.behind}↑{row.item.ahead} ↓{row.item.behind}{/if}
+                        </small>
+                      {/if}
+                    </button>
+                    {#if !row.item.current}
+                      <button
+                        class="row-action"
+                        title={`Rebase ${currentBranch} onto ${row.item.name}`}
+                        on:click={() => rebaseOnto(row.item.name)}
+                        disabled={busy}
+                      >⤴</button>
+                      <button
+                        class="row-action danger"
+                        title={`Delete ${row.item.name}`}
+                        on:click={() => deleteBranch(row.item.name)}
+                        disabled={busy}
+                      >×</button>
+                    {/if}
+                  </div>
+                {/if}
+              {:else}
+                <p class="empty">No local branches</p>
               {/each}
             </div>
           {/if}
         </section>
+        {#if lastOpenNavIndex === 0}<div class="nav-spacer"></div>{/if}
 
         <section class="nav-section">
           <button class="nav-row" on:click={() => (remoteOpen = !remoteOpen)}>
@@ -1063,21 +1193,31 @@
           </button>
           {#if remoteOpen}
             <div class="branch-list">
-              {#each filteredRemoteBranches as branch}
-                <button
-                  class="branch-name"
-                  title={`Checkout tracking branch for ${branch}`}
-                  on:click={() => execute({ kind: "checkoutRemote", target: branch }, `Checkout ${branch}`)}
-                  disabled={busy}
-                >
-                  <span>☁ {branch}</span>
-                </button>
+              {#each remoteTree as row (row.key)}
+                {#if row.kind === "dir"}
+                  <button class="ref-tree-dir" style={`--depth:${row.depth}`} on:click={() => (collapsedRemoteDirs = toggleRefDir(collapsedRemoteDirs, row.key))}>
+                    <span class="tree-chevron">{collapsedRemoteDirs.has(row.key) ? "▸" : "▾"}</span>
+                    {#if row.depth === 0}<i class="tree-folder-icon">☁</i>{/if}
+                    <span>{row.label}</span>
+                  </button>
+                {:else}
+                  <button
+                    class="branch-name tree-leaf"
+                    style={`--depth:${row.depth}`}
+                    title={`Checkout tracking branch for ${row.item}`}
+                    on:click={() => execute({ kind: "checkoutRemote", target: row.item }, `Checkout ${row.item}`)}
+                    disabled={busy}
+                  >
+                    <span class="branch-name-line"><i class="branch-glyph">⑂</i> <span>{row.label}</span></span>
+                  </button>
+                {/if}
               {:else}
                 <p class="empty">No remote branches</p>
               {/each}
             </div>
           {/if}
         </section>
+        {#if lastOpenNavIndex === 1}<div class="nav-spacer"></div>{/if}
 
         <section class="nav-section">
           <div class="section-head">
@@ -1133,6 +1273,7 @@
             </div>
           {/if}
         </section>
+        {#if lastOpenNavIndex === 2}<div class="nav-spacer"></div>{/if}
 
         <section class="nav-section">
           <button class="nav-row" on:click={() => (stashesOpen = !stashesOpen)}>
@@ -1161,6 +1302,7 @@
             </div>
           {/if}
         </section>
+        {#if lastOpenNavIndex === 3}<div class="nav-spacer"></div>{/if}
 
         <section class="nav-section">
           <button class="nav-row" on:click={() => (tagsOpen = !tagsOpen)}>
@@ -1374,12 +1516,18 @@
             <button class="wip-message" on:click={() => selectCommit(null)}>
               <strong>// WIP</strong>
             </button>
-            <span class="wip-count" title={`${totalChanges} WIP file changes`}>
-              <span class="wip-pencil">✎</span>
-              <strong>{wipModified}</strong>
-              <span class="wip-added">+</span>
-              <strong>{wipAdded}</strong>
-            </span>
+            {#if wipModified || wipAdded}
+              <span class="wip-count" title={`${totalChanges} WIP file changes`}>
+                {#if wipModified}
+                  <span class="wip-pencil">✎</span>
+                  <strong>{wipModified}</strong>
+                {/if}
+                {#if wipAdded}
+                  <span class="wip-added">+</span>
+                  <strong>{wipAdded}</strong>
+                {/if}
+              </span>
+            {/if}
           </div>
         </div>
         {#each visibleGraphRows as row, rowIndex}
@@ -1429,7 +1577,14 @@
             <span class="commit-main">
               <strong>
                 <span>{row.commit.subject}</span>
-                {#if row.commit.bodySummary}<em>{row.commit.bodySummary}</em>{/if}
+                {#if row.commit.bodySummary}
+                  <span class="commit-summary">
+                    <em>{row.commit.bodySummary}</em>
+                  </span>
+                {/if}
+                {#if rowIndex > 0 && visibleGraphRows[rowIndex - 1].commit.relativeDate !== row.commit.relativeDate}
+                  <span class="date-marker">{row.commit.relativeDate}</span>
+                {/if}
               </strong>
             </span>
           </button>
@@ -1444,38 +1599,97 @@
     <aside class="right-panel">
       {#if selectedCommit}
         <div class="commit-detail">
-          <div class="changes-title">
-            <button title="Copy hash" on:click={() => selectedCommit && copyHash(selectedCommit.hash)}>⧉</button>
-            <strong>Commit <span>{selectedCommit.shortHash}</span></strong>
-            <button title="Back to work in progress" on:click={() => selectCommit(null)}>×</button>
+          <div class="commit-detail-head">
+            <button class="commit-hash-btn" title="Copy hash" on:click={() => selectedCommit && copyHash(selectedCommit.hash)}>
+              commit: <strong>{selectedCommit.shortHash}</strong>
+            </button>
+            <button class="commit-detail-close" title="Back to work in progress" on:click={() => selectCommit(null)}>×</button>
           </div>
           {#if commitDetailBusy}
             <p class="empty centered">Loading commit…</p>
           {:else if commitDetail}
             <div class="commit-detail-scroll">
-              <div class="commit-meta">
+              <div class="commit-message-card">
                 <h2>{commitDetail.subject}</h2>
-                {#if commitDetail.body}<p class="commit-body">{commitDetail.body}</p>{/if}
-                <div class="commit-meta-line">
-                  <span class="author-badge">{authorInitials(commitDetail.author)}</span>
-                  <div>
-                    <strong>{commitDetail.author}</strong>
-                    <small>{commitDetail.email}</small>
-                  </div>
-                </div>
-                <small>{commitDetail.date} · {commitDetail.relativeDate}</small>
-                {#if commitDetail.refs.length}
-                  <div class="detail-refs">
-                    {#each commitDetail.refs as ref}
-                      <span class="ref-pill" style="--ref-color:#26c6da">{ref.replace(/^HEAD -> /, "")}</span>
-                    {/each}
+                {#if commitDetail.body}
+                  <div class="commit-body-scroll">
+                    <p class="commit-body">{reflowCommitBody(commitDetail.body)}</p>
                   </div>
                 {/if}
+              </div>
+              <div class="split-handle"></div>
+
+              <div class="commit-author-row">
+                <span class="author-badge">{authorInitials(commitDetail.author)}</span>
+                <div class="commit-author-main">
+                  <strong>{commitDetail.author}</strong>
+                  <small>authored {commitDetail.date}</small>
+                </div>
                 {#if commitDetail.parents.length}
-                  <small>
-                    {commitDetail.parents.length === 1 ? "parent" : "parents"}
-                    {commitDetail.parents.map((parent) => parent.slice(0, 8)).join(", ")}
-                  </small>
+                  <div class="commit-parent">
+                    <span>{commitDetail.parents.length === 1 ? "parent" : "parents"}:</span>
+                    <strong>{commitDetail.parents.map((parent) => parent.slice(0, 7)).join(", ")}</strong>
+                  </div>
+                {/if}
+              </div>
+
+              {#if commitDetail.refs.length}
+                <div class="detail-refs">
+                  {#each commitDetail.refs as ref}
+                    <span class="ref-pill" style="--ref-color:#26c6da">{ref.replace(/^HEAD -> /, "")}</span>
+                  {/each}
+                </div>
+              {/if}
+
+              {#if commitFileSummaryParts.length}
+                <div class="commit-change-summary">{#each commitFileSummaryParts as part, index (part.key)}{#if index > 0}<span class="summary-sep">,</span>{/if}<span class={part.cls}>{part.glyph}</span> {part.count} {part.key}{/each}</div>
+              {/if}
+
+              <div class="changes-tools">
+                <button class="sort-btn" title={sortAsc ? "Sorted A to Z" : "Sorted Z to A"} on:click={() => (sortAsc = !sortAsc)}>⇅<i>{sortAsc ? "AZ" : "ZA"}</i></button>
+                <div class="segmented">
+                  <button class:active={rightTab === "path"} on:click={() => (rightTab = "path")}>☰ Path</button>
+                  <button class:active={rightTab === "tree"} on:click={() => (rightTab = "tree")}>⌘ Tree</button>
+                </div>
+              </div>
+
+              <div class="commit-files">
+                {#if rightTab === "tree"}
+                  {#each commitFileTree as row (row.key)}
+                    {#if row.kind === "dir"}
+                      <button class="tree-dir" style={`--depth:${row.depth}`} on:click={() => (collapsedCommitDirs = toggleRefDir(collapsedCommitDirs, row.key))}>
+                        <span>{collapsedCommitDirs.has(row.key) ? "›" : "⌄"}</span>
+                        <strong>{row.label}</strong>
+                      </button>
+                    {:else}
+                      <button
+                        class="commit-file-row tree-row"
+                        class:active={commitFilePath === row.item.path && diffContext === "commit"}
+                        style={`--depth:${row.depth}`}
+                        title={`${statusLabel(row.item.status)}: ${row.item.path}`}
+                        on:click={() => openCommitFile(row.item)}
+                      >
+                        <span class={commitStatusGlyph(row.item.status).cls}>{commitStatusGlyph(row.item.status).glyph}</span>
+                        <strong>{row.label}</strong>
+                      </button>
+                    {/if}
+                  {:else}
+                    <p class="empty">No file changes recorded</p>
+                  {/each}
+                {:else}
+                  {#each sortedCommitFiles as change (change.path)}
+                    <button
+                      class="commit-file-row"
+                      class:active={commitFilePath === change.path && diffContext === "commit"}
+                      title={`${statusLabel(change.status)}: ${change.path}`}
+                      on:click={() => openCommitFile(change)}
+                    >
+                      <span class={commitStatusGlyph(change.status).cls}>{commitStatusGlyph(change.status).glyph}</span>
+                      <strong>{change.path}</strong>
+                    </button>
+                  {:else}
+                    <p class="empty">No file changes recorded</p>
+                  {/each}
                 {/if}
               </div>
 
@@ -1497,23 +1711,6 @@
                 <button class="danger" on:click={() => commitDetail && execute({ kind: "reset", target: commitDetail.hash, mode: resetMode }, `Reset to ${commitDetail.shortHash}`)} disabled={busy}>
                   Reset here
                 </button>
-              </div>
-
-              <div class="commit-files">
-                <h3>{commitDetail.files.length} changed {commitDetail.files.length === 1 ? "file" : "files"}</h3>
-                {#each commitDetail.files as change}
-                  <button
-                    class="commit-file-row"
-                    class:active={commitFilePath === change.path && diffContext === "commit"}
-                    title={`${statusLabel(change.status)}: ${change.path}`}
-                    on:click={() => openCommitFile(change)}
-                  >
-                    <span class={`status-${change.status.toLowerCase()}`}>{change.status}</span>
-                    <strong>{change.path}</strong>
-                  </button>
-                {:else}
-                  <p class="empty">No file changes recorded</p>
-                {/each}
               </div>
             </div>
           {:else}
