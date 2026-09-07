@@ -20,15 +20,17 @@ pub struct RebasePlan {
     pub commits: Vec<CommitNode>, // oldest first
     pub clean: bool,
     pub in_progress: bool,
+    pub current_branch: Option<String>,
+    pub upstream: Option<String>,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_rebase_plan(state: State<'_, AppState>, base: Option<String>) -> Result<RebasePlan, String> {
     let _ = (state, base);
     Err("not implemented".to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn run_interactive_rebase(
     state: State<'_, AppState>,
     base: String,

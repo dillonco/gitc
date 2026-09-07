@@ -32,12 +32,12 @@ pub struct GhRepo {
     pub default_branch: Option<String>,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn gh_status() -> Result<GhStatus, String> {
     Err("not implemented".to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn gh_repo_list(owner: Option<String>, limit: Option<u32>) -> Result<Vec<GhRepo>, String> {
     let _ = (owner, limit);
     Err("not implemented".to_string())

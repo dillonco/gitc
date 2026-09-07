@@ -167,7 +167,7 @@ pub struct FileDiff {
     binary: bool,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn get_repository_state(state: State<'_, AppState>) -> Result<RepositoryState, String> {
     let root = active_repo(&state)?;
     repository_state(&root)
@@ -216,7 +216,7 @@ fn repository_state(root: &Path) -> Result<RepositoryState, String> {
     })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn get_commit_graph(state: State<'_, AppState>, limit: usize) -> Result<CommitGraph, String> {
     let root = active_repo(&state)?;
     commit_graph(&root, limit)
@@ -244,7 +244,7 @@ fn commit_graph(root: &Path, limit: usize) -> Result<CommitGraph, String> {
     })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn get_commit_detail(state: State<'_, AppState>, hash: String) -> Result<CommitDetail, String> {
     let root = active_repo(&state)?;
     commit_detail(&root, &hash)
@@ -301,7 +301,7 @@ fn commit_detail(root: &Path, hash: &str) -> Result<CommitDetail, String> {
     })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn get_commit_file_diff(
     state: State<'_, AppState>,
     hash: String,
@@ -332,7 +332,7 @@ fn commit_file_diff(root: &Path, hash: &str, path: String) -> Result<FileDiff, S
     })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn run_git_action(state: State<'_, AppState>, action: GitAction) -> Result<GitResult, String> {
     let root = active_repo(&state)?;
     run_action(&root, &action)
@@ -356,7 +356,7 @@ fn canonical_or_self(path: &Path) -> PathBuf {
     path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn get_conflict_file(state: State<'_, AppState>, path: String) -> Result<ConflictFile, String> {
     let root = active_repo(&state)?;
     conflict_file(&root, path)
@@ -375,7 +375,7 @@ fn conflict_file(root: &Path, path: String) -> Result<ConflictFile, String> {
     })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn get_file_diff(state: State<'_, AppState>, path: String, staged: bool) -> Result<FileDiff, String> {
     let root = active_repo(&state)?;
     file_diff(&root, path, staged)
@@ -403,7 +403,7 @@ fn file_diff(root: &Path, path: String, staged: bool) -> Result<FileDiff, String
     })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn get_file_content(state: State<'_, AppState>, path: String, staged: bool) -> Result<String, String> {
     let root = active_repo(&state)?;
     file_content(&root, path, staged)
@@ -419,7 +419,7 @@ fn file_content(root: &Path, path: String, staged: bool) -> Result<String, Strin
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn get_file_blame(state: State<'_, AppState>, path: String) -> Result<String, String> {
     let root = active_repo(&state)?;
     file_blame(&root, &path)
@@ -430,7 +430,7 @@ fn file_blame(root: &Path, path: &str) -> Result<String, String> {
     git(root, &["blame", "--date=short", "--", path])
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn get_file_history(state: State<'_, AppState>, path: String) -> Result<String, String> {
     let root = active_repo(&state)?;
     file_history(&root, &path)
@@ -450,7 +450,7 @@ fn file_history(root: &Path, path: &str) -> Result<String, String> {
     )
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn apply_hunk(state: State<'_, AppState>, patch: String, mode: String) -> Result<GitResult, String> {
     let root = active_repo(&state)?;
     apply_hunk_patch(&root, &patch, &mode)
@@ -470,7 +470,7 @@ fn apply_hunk_patch(root: &Path, patch: &str, mode: &str) -> Result<GitResult, S
     Ok(run_git_with_stdin(root, &args, patch))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn set_repository_path(state: State<'_, AppState>, path: String) -> Result<RepositoryState, String> {
     let root = discover_repo_root(Path::new(&path))?;
     *state
@@ -480,7 +480,7 @@ fn set_repository_path(state: State<'_, AppState>, path: String) -> Result<Repos
     get_repository_state(state)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn open_terminal(state: State<'_, AppState>) -> Result<GitResult, String> {
     let root = active_repo(&state)?;
     Ok(run_command(
@@ -492,7 +492,7 @@ fn open_terminal(state: State<'_, AppState>) -> Result<GitResult, String> {
     ))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn pick_repository_folder() -> Result<Option<String>, String> {
     let result = run_command(
         Command::new("osascript").args([
@@ -516,7 +516,7 @@ fn pick_repository_folder() -> Result<Option<String>, String> {
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn create_repository(state: State<'_, AppState>, path: String) -> Result<RepositoryState, String> {
     let root = PathBuf::from(path);
     fs::create_dir_all(&root).map_err(|err| err.to_string())?;
@@ -531,7 +531,7 @@ fn create_repository(state: State<'_, AppState>, path: String) -> Result<Reposit
     get_repository_state(state)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn clone_repository(
     state: State<'_, AppState>,
     url: String,
@@ -558,7 +558,7 @@ fn clone_repository(
     get_repository_state(state)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn save_conflict_resolution(
     state: State<'_, AppState>,
     path: String,

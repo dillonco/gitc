@@ -128,6 +128,8 @@ export interface BranchAudit {
   name: string;
   current: boolean;
   isBase: boolean;
+  head: string;
+  shortHead: string;
   upstream?: string | null;
   upstreamGone: boolean;
   ahead: number;
@@ -162,6 +164,7 @@ export interface RefCompare {
   behind: number;
   files: CommitFileChange[];
   commits: CommitNode[];
+  commitsTruncated: boolean;
 }
 
 
@@ -208,4 +211,6 @@ export interface RebasePlan {
   commits: CommitNode[];
   clean: boolean;
   inProgress: boolean;
+  currentBranch?: string | null;
+  upstream?: string | null;
 }

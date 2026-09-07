@@ -942,7 +942,7 @@ small {
 
 .graph-head {
   display: grid;
-  grid-template-columns: 210px minmax(520px, 58vw) minmax(360px, 1fr);
+  grid-template-columns: 210px minmax(140px, calc(45px + var(--lane-count, 8) * 34px)) minmax(260px, 1fr);
   height: 34px;
   border-bottom: 1px solid var(--edge);
   background: rgba(255, 255, 255, 0.05);
@@ -967,10 +967,9 @@ small {
 .wip-row,
 .commit-row {
   display: grid;
-  grid-template-columns: 210px minmax(520px, 58vw) minmax(360px, 1fr);
+  grid-template-columns: 210px minmax(140px, calc(45px + var(--lane-count, 8) * 34px)) minmax(260px, 1fr);
   align-items: center;
   width: 100%;
-  min-width: 1180px;
   min-height: 52px;
 }
 
@@ -2105,6 +2104,91 @@ summary {
 .modal-footer button {
   min-width: 96px;
   border-color: var(--edge-hi);
+}
+
+/* Shared panel shell for the F1-F4 feature panels (CleanupPanel, CompareView,
+   CloneDialog, RebasePanel). See REVIEW-UX.md section 2 for the full spec.
+   Pair with `.modal`/`.modal-backdrop`/`.modal-body`/`.modal-footer` above
+   and `use:trapFocus` from src/lib/modal.ts. */
+.panel {
+  position: relative;
+  display: grid;
+  grid-template-rows: 42px minmax(0, 1fr) auto;
+  max-height: calc(100vh - 96px);
+}
+
+.panel .modal-body {
+  min-height: 0;
+  overflow: auto;
+}
+
+.panel.size-m {
+  width: min(640px, calc(100vw - 96px));
+}
+
+.panel.size-l {
+  width: min(880px, calc(100vw - 96px));
+}
+
+.panel.size-xl {
+  width: min(1040px, calc(100vw - 96px));
+}
+
+/* Tertiary footer action pinned to the left of [Cancel] [Primary]. */
+.modal-footer .footer-tertiary {
+  margin-right: auto;
+}
+
+.panel-error {
+  margin: 0;
+  border: 1px solid #80424c;
+  border-radius: 10px;
+  background: rgba(44, 23, 28, 0.85);
+  color: #ffd8df;
+  padding: 8px 10px;
+  font-size: 13px;
+  white-space: pre-wrap;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  border: 1px solid var(--edge-hi);
+  border-radius: 8px;
+  color: #aab2bd;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.chip.ok {
+  border-color: rgba(79, 209, 181, 0.55);
+  color: #bfeee2;
+}
+
+.chip.warn {
+  border-color: rgba(217, 164, 65, 0.6);
+  color: #f1cf86;
+}
+
+.chip.danger {
+  border-color: #7d454d;
+  color: #ffd8df;
+}
+
+.danger-fill {
+  border-color: #8a4a54;
+  background: #5c2a33;
+  color: #ffd8df;
+  font-weight: 650;
+}
+
+.danger-fill:hover:not(:disabled) {
+  border-color: #a05a66;
+  background: #6e333d;
 }
 
 .status-bar {

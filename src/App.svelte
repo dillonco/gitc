@@ -152,8 +152,11 @@
     "reset",
     "forcePush",
     "stashDrop",
+    "deleteBranch",
     "deleteBranchForce",
     "cleanUntracked",
+    "rebase",
+    "merge",
   ]);
   const graphColors = [
     "#26c6da",
@@ -324,12 +327,17 @@
     notice = "";
     try {
       const result = await runGitAction(action);
+      // refresh() unconditionally clears `error` at its start, so a failure
+      // message would otherwise be wiped the instant it's set. Re-apply it
+      // after refresh() runs so the toast is actually shown.
+      let failure = "";
       if (!result.ok) {
-        error = result.stderr || result.stdout || `${label} failed`;
+        failure = result.stderr || result.stdout || `${label} failed`;
       } else {
         notice = `${label} complete`;
       }
       if (result.refresh) await refresh();
+      if (failure) error = failure;
       if (selectedFile && action.path === selectedFile.path && diffContext === "worktree") {
         const stillThere = state?.files.some(
           (file) => file.path === selectedFile?.path && normalizedGroup(file) === selectedFile?.group,
@@ -1092,7 +1100,7 @@
     </aside>
   {/if}
 
-  <section class="graph-area">
+  <section class="graph-area" style={`--lane-count:${graphLaneCount}`}>
     {#if busy}<div class="busy-bar" aria-hidden="true"></div>{/if}
     {#if error}
       <div class="message error" role="alert">

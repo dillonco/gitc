@@ -14,9 +14,10 @@ pub struct RefCompare {
     pub behind: u32,
     pub files: Vec<CommitFileChange>,
     pub commits: Vec<CommitNode>, // git log base..head, newest first
+    pub commits_truncated: bool,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_ref_compare(
     state: State<'_, AppState>,
     base: Option<String>,
@@ -27,7 +28,7 @@ pub fn get_ref_compare(
     Err("not implemented".to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_ref_file_diff(
     state: State<'_, AppState>,
     base: Option<String>,

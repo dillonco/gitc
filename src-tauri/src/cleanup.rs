@@ -9,6 +9,8 @@ pub struct BranchAudit {
     pub name: String,
     pub current: bool,
     pub is_base: bool,
+    pub head: String,
+    pub short_head: String,
     pub upstream: Option<String>,
     pub upstream_gone: bool,
     pub ahead: u32,
@@ -32,7 +34,7 @@ pub struct BranchCleanupReport {
     pub branches: Vec<BranchAudit>,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_branch_cleanup(
     state: State<'_, AppState>,
     base: Option<String>,
