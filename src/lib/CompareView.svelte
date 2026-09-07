@@ -236,23 +236,26 @@
             <p class="empty">{busy ? "Loading commits…" : "No commits"}</p>
           {/each}
         </div>
-        <div class="compare-group compare-files" bind:this={fileListEl}>
-          <div class="compare-group-head">FILES ({compare?.files.length ?? 0})</div>
-          {#each compare?.files ?? [] as change (change.path)}
-            <button
-              class="commit-file-row"
-              class:active={selectedFile?.path === change.path}
-              title={`${statusLabel(change.status)}: ${change.path}`}
-              aria-pressed={selectedFile?.path === change.path}
-              on:click={() => selectFile(change)}
-              on:keydown={onFileRowKeydown}
-            >
-              <span class={`status-${change.status.toLowerCase()}`}>{change.status}</span>
-              <strong>{change.path}</strong>
-            </button>
-          {:else}
-            <p class="empty">{busy ? "Loading files…" : "No differences"}</p>
-          {/each}
+        <div class="compare-group">
+          <div class="compare-group-head" id="compare-files-head">FILES ({compare?.files.length ?? 0})</div>
+          <div class="compare-file-list" role="listbox" aria-labelledby="compare-files-head" bind:this={fileListEl}>
+            {#each compare?.files ?? [] as change (change.path)}
+              <button
+                class="commit-file-row"
+                role="option"
+                class:active={selectedFile?.path === change.path}
+                title={`${statusLabel(change.status)}: ${change.path}`}
+                aria-selected={selectedFile?.path === change.path}
+                on:click={() => selectFile(change)}
+                on:keydown={onFileRowKeydown}
+              >
+                <span class={`status-${change.status.toLowerCase()}`}>{change.status}</span>
+                <strong>{change.path}</strong>
+              </button>
+            {:else}
+              <p class="empty">{busy ? "Loading files…" : "No differences"}</p>
+            {/each}
+          </div>
         </div>
       {/if}
     {/if}
@@ -418,7 +421,7 @@
     font-size: 11px;
   }
 
-  .compare-files {
+  .compare-file-list {
     display: flex;
     flex-direction: column;
   }
