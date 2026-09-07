@@ -1551,7 +1551,9 @@
             <div class="branch-cell"></div>
             <div class="wip-graph">
               <span class="wip-rail"></span>
-              <span class="wip-node"></span>
+              <svg class="wip-node" viewBox="0 0 22 22" aria-hidden="true">
+                <circle cx="11" cy="11" r="9.6" pathLength="110" />
+              </svg>
             </div>
             <div class="wip-summary">
               <button class="wip-message" on:click={() => selectCommit(null)}>

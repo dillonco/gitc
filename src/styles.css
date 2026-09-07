@@ -1241,14 +1241,15 @@ small {
   top: 50%;
   bottom: -2px;
   left: calc(var(--lane-center) - 1px);
-  width: 2px;
+  width: 3px;
   /* Dashed, like the WIP node: the run from uncommitted work down to the
      first real commit is not yet history. A repeating gradient keeps the
-     dash rhythm independent of border-image quirks. */
+     dash rhythm independent of border-image quirks; 3.8/2.8 matches the
+     node's dash weight so the two read as one dotted run. */
   background: repeating-linear-gradient(
     to bottom,
-    var(--teal) 0 3px,
-    transparent 3px 6px
+    var(--teal) 0 3.8px,
+    transparent 3.8px 6.6px
   );
 }
 
@@ -1258,14 +1259,25 @@ small {
   left: var(--lane-center);
   width: 22px;
   height: 22px;
+  overflow: visible;
   transform: translate(-50%, -50%);
   /* Above .wip-graph::after: generated content paints after the element's
      children, so without this the teal block covers the node's right half.
      Mirrors the commit rows, where .graph-tint is 0 and .commit-dot is 3. */
   z-index: 3;
-  border: 2px dashed var(--teal);
-  border-radius: 50%;
-  background: transparent;
+}
+
+/* An SVG rather than `border: dashed`, because the browser picks its own
+   dash rhythm for a circular border — finer and more numerous than the
+   reference. pathLength normalises the circumference to 110 units so a
+   7+3 period yields exactly 11 evenly spaced dashes and the ring closes
+   cleanly; with raw px the pattern divided unevenly and left a seam. */
+.wip-node circle {
+  fill: none;
+  stroke: var(--teal);
+  stroke-width: 3px;
+  stroke-dasharray: 7 3;
+  stroke-linecap: butt;
 }
 
 .wip-summary {
