@@ -12,6 +12,7 @@ import type {
   GitAction,
   GitResult,
   RebasePlan,
+  RebaseStep,
   RefCompare,
   RepositoryState,
   StashEntry,
@@ -896,6 +897,105 @@ function rebasePlan(base: string | null): RebasePlan {
   };
 }
 
+// Git convention: the first line of a message is the subject, a blank line
+// then separates it from the (optional) body.
+function splitMessage(message: string): { subject: string; body: string } {
+  const lines = message.replace(/\r\n/g, "\n").split("\n");
+  const subject = (lines[0] ?? "").trim();
+  const body = lines.slice(1).join("\n").replace(/^\n+/, "").trim();
+  return { subject, body };
+}
+
+function summarizeBody(body: string): string {
+  return body.split("\n")[0] ?? "";
+}
+
+function dedupeFiles(files: CommitFileChange[]): CommitFileChange[] {
+  const byPath = new Map<string, CommitFileChange>();
+  for (const entry of files) byPath.set(entry.path, entry);
+  return [...byPath.values()];
+}
+
+// Mirrors the real backend's interactive_rebase: validate the plan against
+// the commits actually between `base` and HEAD, apply
+// pick/reword/squash/fixup/drop + reorder, and relink the result onto
+// `base`. `steps` is oldest-first, matching the todo-file contract.
+function runInteractiveRebase(base: string, steps: RebaseStep[]): GitResult {
+  if (demo.merging || demo.rebasing) return fail("a rebase or merge is already in progress");
+  if (demo.files.length > 0) return fail("commit or stash your changes before rebasing");
+
+  const baseIndex = resolveDemoRef(base);
+  if (baseIndex === -1) return fail(`unknown ref '${base}'`);
+
+  const range = demoCommits.slice(0, baseIndex); // newest first
+  if (range.length === 0) return fail(`there are no commits between ${base} and HEAD`);
+  if (steps.length !== range.length) {
+    return fail(
+      "rebase plan must include every commit between the base and HEAD exactly once (drops must be explicit)",
+    );
+  }
+
+  const byHash = new Map(range.map((entry) => [entry.hash, entry]));
+  const seen = new Set<string>();
+  for (const item of steps) {
+    if (!byHash.has(item.hash)) return fail(`commit ${item.hash} is not part of this rebase`);
+    if (seen.has(item.hash)) return fail(`commit ${item.hash} appears more than once in the rebase plan`);
+    seen.add(item.hash);
+  }
+  const firstLive = steps.find((item) => item.action !== "drop");
+  if (firstLive && (firstLive.action === "squash" || firstLive.action === "fixup")) {
+    return fail("the first commit in a rebase can't be squashed or fixed up");
+  }
+
+  const output: DemoCommit[] = [];
+  for (const item of steps) {
+    const source = byHash.get(item.hash)!;
+    switch (item.action) {
+      case "drop":
+        continue;
+      case "pick":
+        output.push({ ...source, refs: [] });
+        break;
+      case "reword": {
+        const message = item.message?.trim() ? item.message : source.subject;
+        const { subject, body } = splitMessage(message);
+        output.push({ ...source, subject, body, bodySummary: summarizeBody(body), refs: [] });
+        break;
+      }
+      case "squash":
+      case "fixup": {
+        if (output.length === 0) return fail(`cannot ${item.action} without a preceding commit`);
+        const prev = output[output.length - 1];
+        const files = dedupeFiles([...prev.files, ...source.files]);
+        if (item.action === "fixup") {
+          output[output.length - 1] = { ...prev, files };
+        } else {
+          const defaultMessage = `${prev.subject}${prev.body ? `\n\n${prev.body}` : ""}\n\n${source.subject}${source.body ? `\n\n${source.body}` : ""}`;
+          const { subject, body } = splitMessage(item.message?.trim() ? item.message : defaultMessage);
+          output[output.length - 1] = { ...prev, subject, body, bodySummary: summarizeBody(body), files };
+        }
+        break;
+      }
+      default:
+        return fail(`unsupported rebase action '${item.action}'`);
+    }
+  }
+
+  if (output.length === 0) {
+    demoCommits.splice(0, baseIndex);
+  } else {
+    let parentHash = demoCommits[baseIndex].hash;
+    for (const entry of output) {
+      entry.parents = [parentHash];
+      parentHash = entry.hash;
+    }
+    output[output.length - 1].refs = [`HEAD -> ${demo.currentBranch}`];
+    demoCommits.splice(0, baseIndex, ...output.slice().reverse());
+  }
+
+  return ok(`Successfully rebased and updated refs/heads/${demo.currentBranch}.`);
+}
+
 export async function demoInvoke<T>(command: string, args: Record<string, unknown>): Promise<T> {
   switch (command) {
     case "get_repository_state":
@@ -1026,7 +1126,7 @@ export async function demoInvoke<T>(command: string, args: Record<string, unknow
     case "get_rebase_plan":
       return rebasePlan((args.base as string | null | undefined) ?? null) as T;
     case "run_interactive_rebase":
-      throw new Error("demo backend: run_interactive_rebase not implemented yet");
+      return runInteractiveRebase(String(args.base), args.steps as RebaseStep[]) as T;
     default:
       throw new Error(`demo backend: unknown command '${command}'`);
   }
