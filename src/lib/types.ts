@@ -11,6 +11,13 @@ export interface Branch {
   name: string;
   current: boolean;
   upstream?: string | null;
+  // F1 fields are optional for now so Stage 0 compiles without touching demo
+  // seeds; F1 makes them required and updates the seeds.
+  upstreamGone?: boolean;
+  ahead?: number;
+  behind?: number;
+  lastCommitUnix?: number;
+  lastCommitRelative?: string;
 }
 
 export interface StashEntry {
@@ -112,4 +119,93 @@ export interface FileDiff {
   staged: boolean;
   diff: string;
   binary: boolean;
+}
+
+
+// ---- F1: branch & worktree cleanup ----
+
+export interface BranchAudit {
+  name: string;
+  current: boolean;
+  isBase: boolean;
+  upstream?: string | null;
+  upstreamGone: boolean;
+  ahead: number;
+  behind: number;
+  aheadOfBase: number;
+  behindBase: number;
+  merged: boolean;
+  squashMerged: boolean;
+  stale: boolean;
+  lastCommitUnix: number;
+  lastCommitRelative: string;
+  worktreePath?: string | null;
+  classification: string; // "current" | "base" | "merged" | "squashMerged" | "gone" | "stale" | "active"
+}
+
+export interface BranchCleanupReport {
+  base: string;
+  staleDays: number;
+  branches: BranchAudit[];
+}
+
+
+
+// ---- F2: ref compare ----
+
+export interface RefCompare {
+  base: string;
+  head: string;
+  mergeBase?: string | null;
+  threeDot: boolean;
+  ahead: number;
+  behind: number;
+  files: CommitFileChange[];
+  commits: CommitNode[];
+}
+
+
+
+// ---- F3: gh clone ----
+
+export interface GhStatus {
+  installed: boolean;
+  authenticated: boolean;
+  login?: string | null;
+  host: string;
+  protocol: string; // "https" | "ssh"
+  message?: string | null;
+}
+
+export interface GhRepo {
+  name: string;
+  nameWithOwner: string;
+  owner: string;
+  description?: string | null;
+  isPrivate: boolean;
+  isFork: boolean;
+  isArchived: boolean;
+  pushedAt?: string | null;
+  url: string;
+  sshUrl: string;
+  language?: string | null;
+  defaultBranch?: string | null;
+}
+
+
+
+// ---- F4: rebase ----
+
+export interface RebaseStep {
+  action: string;
+  hash: string;
+  message?: string | null;
+}
+
+export interface RebasePlan {
+  base: string;
+  mergeBase?: string | null;
+  commits: CommitNode[];
+  clean: boolean;
+  inProgress: boolean;
 }

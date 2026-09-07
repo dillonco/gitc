@@ -6,6 +6,14 @@ use std::process::{Command, Stdio};
 use std::sync::Mutex;
 use tauri::State;
 
+// ---- Feature modules (one per work stream; keep alphabetical) ----
+mod cleanup;
+mod compare;
+mod gh;
+mod rebase;
+#[cfg(test)]
+mod test_support;
+
 struct AppState {
     repo_root: Mutex<PathBuf>,
 }
@@ -590,7 +598,15 @@ pub fn run() {
             get_file_blame,
             get_file_history,
             get_conflict_file,
-            save_conflict_resolution
+            save_conflict_resolution,
+            // ---- stream commands (stubs land in Stage 0; bodies per stream) ----
+            cleanup::get_branch_cleanup,
+            compare::get_ref_compare,
+            compare::get_ref_file_diff,
+            gh::gh_status,
+            gh::gh_repo_list,
+            rebase::get_rebase_plan,
+            rebase::run_interactive_rebase,
         ])
         .run(tauri::generate_context!())
         .expect("error while running gitc");
@@ -620,6 +636,28 @@ fn discover_repo_root(path: &Path) -> Result<PathBuf, String> {
     }
 }
 
+/// The branch feature work is measured against: origin/HEAD's target if the
+/// remote advertises one, else a local `main`/`master`, else the current branch.
+/// Unused outside tests until the F1/F2/F4 streams call it; see PLAN.md.
+#[allow(dead_code)]
+fn default_base_branch(root: &Path) -> Result<String, String> {
+    if let Some(head) = git_optional(root, &["symbolic-ref", "--short", "refs/remotes/origin/HEAD"])? {
+        if let Some(local) = head.strip_prefix("origin/") {
+            if git_optional(root, &["rev-parse", "--verify", "--quiet", &format!("refs/heads/{local}")])?.is_some() {
+                return Ok(local.to_string());
+            }
+            return Ok(head);
+        }
+    }
+    for candidate in ["main", "master"] {
+        if git_optional(root, &["rev-parse", "--verify", "--quiet", &format!("refs/heads/{candidate}")])?.is_some() {
+            return Ok(candidate.to_string());
+        }
+    }
+    git_optional(root, &["branch", "--show-current"])?
+        .ok_or_else(|| "unable to determine a base branch".to_string())
+}
+
 fn git(root: &Path, args: &[&str]) -> Result<String, String> {
     let result = run_git(root, args);
     if result.ok {
@@ -644,7 +682,18 @@ fn git_optional(root: &Path, args: &[&str]) -> Result<Option<String>, String> {
 }
 
 fn run_git(root: &Path, args: &[&str]) -> GitResult {
-    run_command(Command::new("git").args(args).current_dir(root), true)
+    run_git_env(root, args, &[])
+}
+
+/// Like `run_git`, but with extra environment variables for this one call.
+/// Used by interactive rebase (GIT_SEQUENCE_EDITOR / GIT_EDITOR).
+fn run_git_env(root: &Path, args: &[&str], env: &[(&str, &str)]) -> GitResult {
+    let mut command = Command::new("git");
+    command.args(args).current_dir(root);
+    for (key, value) in env {
+        command.env(key, value);
+    }
+    run_command(&mut command, true)
 }
 
 fn run_command(command: &mut Command, refresh: bool) -> GitResult {
@@ -1374,52 +1423,12 @@ u UU N... 100644 100644 100644 100644 a b c d conflicted.txt";
 #[cfg(test)]
 mod git_integration_tests {
     use super::*;
-    use std::sync::atomic::{AtomicUsize, Ordering};
-
-    static REPO_COUNTER: AtomicUsize = AtomicUsize::new(0);
-
-    struct TempRepo(PathBuf);
-
-    impl TempRepo {
-        fn new() -> Self {
-            let dir = std::env::temp_dir().join(format!(
-                "gitc-test-{}-{}",
-                std::process::id(),
-                REPO_COUNTER.fetch_add(1, Ordering::SeqCst)
-            ));
-            fs::create_dir_all(&dir).expect("create temp repo dir");
-            run(&dir, &["init", "-b", "main"]);
-            run(&dir, &["config", "user.email", "test@gitc.dev"]);
-            run(&dir, &["config", "user.name", "Test User"]);
-            run(&dir, &["config", "commit.gpgsign", "false"]);
-            TempRepo(dir)
-        }
-
-        fn path(&self) -> &Path {
-            &self.0
-        }
-    }
-
-    impl Drop for TempRepo {
-        fn drop(&mut self) {
-            fs::remove_dir_all(&self.0).ok();
-        }
-    }
-
-    fn run(root: &Path, args: &[&str]) -> GitResult {
-        let result = run_git(root, args);
-        assert!(result.ok, "git {args:?} failed: {}", result.stderr);
-        result
-    }
-
-    fn write_file(root: &Path, name: &str, content: &str) {
-        fs::write(root.join(name), content).expect("write file");
-    }
-
-    fn commit_all(root: &Path, message: &str) {
-        run(root, &["add", "-A"]);
-        run(root, &["commit", "-m", message]);
-    }
+    // Explicit (non-glob) imports so these shadow same-named items pulled in
+    // by `use super::*` above (notably the crate's own `run()` entry point).
+    use super::test_support::{
+        act, commit_all, head_subject, ok_action, run, write_file, TempRepo, REPO_COUNTER,
+    };
+    use std::sync::atomic::Ordering;
 
     #[test]
     fn reports_status_groups_from_a_real_repository() {
@@ -1601,34 +1610,6 @@ mod git_integration_tests {
         assert!(diff.contains("+hello"));
         assert!(diff.contains("+world"));
         assert!(!diff.contains("\\ No newline at end of file"));
-    }
-
-    // ---- helpers for driving the real action dispatcher ----
-
-    fn act(kind: &str) -> GitAction {
-        GitAction {
-            kind: kind.to_string(),
-            path: None,
-            message: None,
-            branch: None,
-            target: None,
-            remote: None,
-            mode: None,
-        }
-    }
-
-    fn ok_action(root: &Path, action: &GitAction) -> GitResult {
-        let result = run_action(root, action).expect("action_args must succeed");
-        assert!(
-            result.ok,
-            "action {:?} failed: {}",
-            action.kind, result.stderr
-        );
-        result
-    }
-
-    fn head_subject(root: &Path) -> String {
-        git(root, &["log", "-1", "--format=%s"]).unwrap()
     }
 
     // ---- success paths for the action dispatcher ----
@@ -2419,5 +2400,42 @@ prunable gitdir file points to non-existent location
         let result = run_action(repo.path(), &act("worktreePrune")).unwrap();
         assert!(result.ok, "prune failed: {}", result.stderr);
         assert_eq!(repository_state(repo.path()).unwrap().worktrees.len(), 1);
+    }
+
+    // ---- default_base_branch ----
+
+    #[test]
+    fn default_base_branch_is_main_on_a_fresh_repo() {
+        let repo = TempRepo::new();
+        write_file(repo.path(), "a.txt", "one\n");
+        commit_all(repo.path(), "init");
+
+        assert_eq!(default_base_branch(repo.path()).unwrap(), "main");
+    }
+
+    #[test]
+    fn default_base_branch_stays_main_after_switching_branches() {
+        let repo = TempRepo::new();
+        write_file(repo.path(), "a.txt", "one\n");
+        commit_all(repo.path(), "init");
+        run(repo.path(), &["checkout", "-b", "other"]);
+
+        assert_eq!(default_base_branch(repo.path()).unwrap(), "main");
+    }
+
+    #[test]
+    fn default_base_branch_falls_back_to_current_branch_without_main_or_master() {
+        let dir = std::env::temp_dir().join(format!("gitc-test-trunk-{}", std::process::id()));
+        fs::create_dir_all(&dir).expect("create temp repo dir");
+        run(&dir, &["init", "-b", "trunk"]);
+        run(&dir, &["config", "user.email", "test@gitc.dev"]);
+        run(&dir, &["config", "user.name", "Test User"]);
+        run(&dir, &["config", "commit.gpgsign", "false"]);
+        write_file(&dir, "a.txt", "one\n");
+        commit_all(&dir, "init");
+
+        assert_eq!(default_base_branch(&dir).unwrap(), "trunk");
+
+        fs::remove_dir_all(&dir).ok();
     }
 }

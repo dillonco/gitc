@@ -516,6 +516,10 @@ function runAction(action: GitAction): GitResult {
     case "revert":
     case "reset":
       return ok();
+    // ---- F1: branch & worktree cleanup ----
+    // ---- F2: ref compare ----
+    // ---- F3: gh clone ----
+    // ---- F4: rebase ----
     default:
       return fail(`demo backend: unknown action '${action.kind}'`);
   }
@@ -614,6 +618,24 @@ export async function demoInvoke<T>(command: string, args: Record<string, unknow
       return fail("terminal is unavailable in browser demo mode") as T;
     case "pick_repository_folder":
       return "/Users/christine/dev/demo-picked" as T;
+    // ---- F1: branch & worktree cleanup ----
+    case "get_branch_cleanup":
+      throw new Error("demo backend: get_branch_cleanup not implemented yet");
+    // ---- F2: ref compare ----
+    case "get_ref_compare":
+      throw new Error("demo backend: get_ref_compare not implemented yet");
+    case "get_ref_file_diff":
+      throw new Error("demo backend: get_ref_file_diff not implemented yet");
+    // ---- F3: gh clone ----
+    case "gh_status":
+      throw new Error("demo backend: gh_status not implemented yet");
+    case "gh_repo_list":
+      throw new Error("demo backend: gh_repo_list not implemented yet");
+    // ---- F4: rebase ----
+    case "get_rebase_plan":
+      throw new Error("demo backend: get_rebase_plan not implemented yet");
+    case "run_interactive_rebase":
+      throw new Error("demo backend: run_interactive_rebase not implemented yet");
     default:
       throw new Error(`demo backend: unknown command '${command}'`);
   }

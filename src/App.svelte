@@ -19,8 +19,11 @@
     setRepositoryPath,
   } from "./lib/git";
   import DiffTable from "./lib/DiffTable.svelte";
+  // F1: component import
   import FileGroup from "./lib/FileGroup.svelte";
   import ReadonlyPane from "./lib/ReadonlyPane.svelte";
+  import { parseDiffRows } from "./lib/diffRows";
+  // F3: component import
   import type {
     CommitDetail,
     CommitFileChange,
@@ -32,6 +35,7 @@
     RepositoryState,
     Worktree,
   } from "./lib/types";
+  // F2: component import
 
   type AppTab = {
     id: string;
@@ -39,6 +43,7 @@
     label: string;
     path?: string;
   };
+  // F4: component import
 
   type GraphLane = {
     index: number;
@@ -104,6 +109,7 @@
   let splitDiff = false;
   let selectedHunk = 0;
   let conflict: ConflictFile | null = null;
+  // F2: compare state
   let resolvedContent = "";
   let commitMessage = "";
   let commitDescription = "";
@@ -111,6 +117,7 @@
   let commandTarget = "";
   let branchName = "";
   let resetMode = "mixed";
+  // F4: rebase state
   let rightTab: "path" | "tree" = "path";
   let searchOpen = false;
   let searchQuery = "";
@@ -120,6 +127,7 @@
   let stashesOpen = true;
   let tagsOpen = false;
   let worktreesOpen = true;
+  // F1: cleanup state
   let unstagedOpen = true;
   let stagedOpen = true;
   let actionsOpen = false;
@@ -131,6 +139,7 @@
   let notice = "";
   let noticeTimer: ReturnType<typeof setTimeout> | null = null;
   let filterInput: HTMLInputElement | null = null;
+  // F3: clone dialog state
 
   // Success toasts dismiss themselves; errors stay until addressed.
   $: if (notice) {
@@ -498,6 +507,7 @@
       busy = false;
     }
   }
+  // F3: clone helpers
 
   async function openRepositoryPath(path: string, silent = false) {
     busy = true;
@@ -547,41 +557,6 @@
     fileViewMode = mode;
     if (mode === "diff") return;
     await loadFileAuxiliary();
-  }
-
-  function parseDiffRows(diff: string) {
-    let oldLine = 0;
-    let newLine = 0;
-    const skip = [
-      "diff --git",
-      "index ",
-      "--- ",
-      "+++ ",
-      "new file mode",
-      "deleted file mode",
-      "old mode",
-      "new mode",
-      "similarity index",
-      "rename from",
-      "rename to",
-      "copy from",
-      "copy to",
-    ];
-    return diff
-      .split("\n")
-      .filter((line) => !skip.some((prefix) => line.startsWith(prefix)))
-      .map((line) => {
-        const hunk = line.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
-        if (hunk) {
-          oldLine = Number(hunk[1]);
-          newLine = Number(hunk[2]);
-          return { kind: "hunk", oldNo: "", newNo: "", text: line };
-        }
-        if (line.startsWith("\\")) return { kind: "meta", oldNo: "", newNo: "", text: line };
-        if (line.startsWith("+")) return { kind: "add", oldNo: "", newNo: String(newLine++), text: line };
-        if (line.startsWith("-")) return { kind: "del", oldNo: String(oldLine++), newNo: "", text: line };
-        return { kind: "ctx", oldNo: oldLine ? String(oldLine++) : "", newNo: newLine ? String(newLine++) : "", text: line };
-      });
   }
 
   function laneColor(index: number) {
@@ -697,6 +672,7 @@
     if (!name?.trim()) return;
     execute({ kind: "createTag", branch: name.trim(), target: target ?? null }, `Tag ${name.trim()}`);
   }
+  // F2: compare helpers
 
   function createBranchAtCommit(hash: string) {
     const name = prompt("Branch name for this commit");
@@ -761,6 +737,7 @@
     }
     await refresh();
   }
+  // F1: cleanup helpers
 
   async function copyHash(hash: string) {
     try {
@@ -770,6 +747,7 @@
       notice = hash;
     }
   }
+  // F4: rebase helpers
 
   function showAddRepoNotice() {
     activeTabId = "launchpad";
@@ -1176,6 +1154,7 @@
           {/each}
         </section>
       </div>
+    <!-- F2: compare center mode -->
     {:else if centerMode === "file" && diffContext === "commit"}
       <div class="file-diff-shell commit-context">
         <header class="file-diff-header">
@@ -1497,6 +1476,7 @@
       {/if}
     </aside>
   {/if}
+  <!-- F4: rebase panel mount -->
 
   {#if conflict}
     <section class="merge-editor">
@@ -1524,6 +1504,7 @@
       </div>
     </section>
   {/if}
+  <!-- F3: clone dialog mount -->
 
   {#if settingsOpen}
     <div
@@ -1557,6 +1538,7 @@
       </div>
     </div>
   {/if}
+  <!-- F1: cleanup panel mount -->
 
   <footer class="status-bar">
     <span>⌁ {repoName}</span>

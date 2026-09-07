@@ -1,10 +1,16 @@
 import type {
+  BranchCleanupReport,
   CommitDetail,
   CommitGraph,
   ConflictFile,
   FileDiff,
+  GhRepo,
+  GhStatus,
   GitAction,
   GitResult,
+  RebasePlan,
+  RebaseStep,
+  RefCompare,
   RepositoryState,
 } from "./types";
 
@@ -88,4 +94,45 @@ export function getFileHistory(path: string): Promise<string> {
 
 export function saveConflictResolution(path: string, content: string): Promise<GitResult> {
   return call("save_conflict_resolution", { path, content });
+}
+
+// ---- F1: branch & worktree cleanup ----
+
+export function getBranchCleanup(base: string | null, staleDays: number | null): Promise<BranchCleanupReport> {
+  return call("get_branch_cleanup", { base, staleDays });
+}
+
+// ---- F2: ref compare ----
+
+export function getRefCompare(base: string | null, head: string, threeDot: boolean): Promise<RefCompare> {
+  return call("get_ref_compare", { base, head, threeDot });
+}
+
+export function getRefFileDiff(
+  base: string | null,
+  head: string,
+  path: string,
+  threeDot: boolean,
+): Promise<FileDiff> {
+  return call("get_ref_file_diff", { base, head, path, threeDot });
+}
+
+// ---- F3: gh clone ----
+
+export function ghStatus(): Promise<GhStatus> {
+  return call("gh_status");
+}
+
+export function ghRepoList(owner: string | null, limit: number | null): Promise<GhRepo[]> {
+  return call("gh_repo_list", { owner, limit });
+}
+
+// ---- F4: rebase ----
+
+export function getRebasePlan(base: string | null): Promise<RebasePlan> {
+  return call("get_rebase_plan", { base });
+}
+
+export function runInteractiveRebase(base: string, steps: RebaseStep[]): Promise<GitResult> {
+  return call("run_interactive_rebase", { base, steps });
 }
