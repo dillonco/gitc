@@ -1843,13 +1843,16 @@ small {
   margin-top: 0;
 }
 
-.change-group-head.compact button {
+/* Must exclude .section-toggle: this selector outranks the
+   `.change-group-head .section-toggle` reset, so without it the red
+   treatment leaks onto the section label button. */
+.change-group-head.compact button:not(.section-toggle) {
   border-color: var(--red-border);
   background: var(--red-fill);
   color: var(--red-text);
 }
 
-.change-group-head.compact button:hover:not(:disabled) {
+.change-group-head.compact button:not(.section-toggle):hover:not(:disabled) {
   border-color: #e5716e;
   background: #5c3a40;
 }
