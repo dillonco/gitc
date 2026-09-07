@@ -1636,13 +1636,29 @@ small {
   text-align: center;
 }
 
+/* Flex, not grid: the hunk toolbar only exists for worktree diffs, so a
+   fixed grid-template-rows either strands a row or — as it did — hands
+   the 1fr slot to the toolbar and pushes the table into an implicit row.
+   Here every bar sizes to content and the table takes what is left. */
 .file-diff-shell {
-  display: grid;
-  grid-template-rows: 40px 36px minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   height: 100%;
   min-height: 0;
   overflow: hidden;
   background: var(--bg);
+}
+
+.file-diff-shell > .file-diff-header,
+.file-diff-shell > .file-diff-toolbar,
+.file-diff-shell > .hunk-toolbar {
+  flex: none;
+}
+
+.file-diff-shell > .diff-table {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 
 .file-diff-header {
