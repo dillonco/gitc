@@ -533,10 +533,10 @@ p {
   min-height: 28px;
   /* --depth comes from buildRefTree()'s folder nesting (branch names split
      on "/"), so a leaf inside a folder indents further than a top-level one.
-     30px (not .ref-tree-dir's 16px) because a leaf has no chevron before its
-     icon — this lines the leaf's branch glyph up with a sibling folder's
-     own icon (chevron 8px + 6px gap past the folder row's 16px base). */
-  padding: 0 8px 0 calc(30px + var(--depth, 0) * 16px);
+     Same 16px base as .ref-tree-dir — the reference has no chevron ahead of
+     either icon, so a leaf's branch icon lines up directly under a sibling
+     folder's icon at the same depth. */
+  padding: 0 8px 0 calc(16px + var(--depth, 0) * 16px);
   background: transparent;
   border-radius: 0;
   font-size: 13px;
@@ -575,11 +575,17 @@ p {
   font-style: normal;
 }
 
-.branch-glyph {
+/* Both a directory row's folder icon and a leaf row's branch icon: same
+   13px box, same --ink-dim colour, drawn with stroke="currentColor" so one
+   rule covers both regardless of which path is inside. The reference marks
+   a folder row with a folder icon and a branch row with a branch icon and
+   nothing else — no separate chevron glyph — so the toggle affordance here
+   is the icon itself plus the row being clickable, not an arrow. */
+.tree-icon {
   flex: none;
+  width: 13px;
+  height: 13px;
   color: var(--ink-dim);
-  font-size: 11px;
-  font-style: normal;
 }
 
 .ref-tree-dir {
@@ -587,7 +593,7 @@ p {
   width: 100%;
   min-height: 28px;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   border-radius: 0;
   background: transparent;
   padding: 0 8px 0 calc(16px + var(--depth, 0) * 16px);
@@ -600,20 +606,6 @@ p {
 .ref-tree-dir:hover:not(:disabled) {
   border-color: transparent;
   background: rgba(255, 255, 255, 0.05);
-}
-
-.ref-tree-dir .tree-chevron {
-  flex: none;
-  width: 8px;
-  color: var(--ink-label);
-  font-size: 9px;
-}
-
-.ref-tree-dir .tree-folder-icon {
-  flex: none;
-  color: var(--ink-dim);
-  font-size: 11px;
-  font-style: normal;
 }
 
 .branch-row {
@@ -2620,11 +2612,22 @@ summary::-webkit-details-marker {
   font-weight: 500;
 }
 
+/* Not in the reference at all (it shows co-author avatars here, a feature
+   we don't have) — kept as real information (which refs point at this
+   commit is genuine, useful data) but demoted to a quiet caption line
+   instead of a row of bright .ref-pill chips competing with the author
+   line right above it. */
 .detail-refs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  padding: 8px 2px 0;
+  overflow: hidden;
+  padding: 4px 2px 0;
+  color: var(--ink-dim);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-refs-label {
+  margin-right: 4px;
 }
 
 .commit-change-summary {

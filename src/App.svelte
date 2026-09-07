@@ -1151,8 +1151,7 @@
               {#each localTree as row (row.key)}
                 {#if row.kind === "dir"}
                   <button class="ref-tree-dir" style={`--depth:${row.depth}`} on:click={() => (collapsedLocalDirs = toggleRefDir(collapsedLocalDirs, row.key))}>
-                    <span class="tree-chevron">{collapsedLocalDirs.has(row.key) ? "▸" : "▾"}</span>
-                    <i class="tree-folder-icon">◫</i>
+                    <svg class="tree-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>
                     <span>{row.label}</span>
                   </button>
                 {:else}
@@ -1165,7 +1164,7 @@
                     >
                       <span class="branch-name-line">
                         {#if row.item.current}<i class="branch-check">✓</i>{/if}
-                        <i class="branch-glyph">⑂</i>
+                        <svg class="tree-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15" /><circle cx="18" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><path d="M18 9a9 9 0 0 1-9 9" /></svg>
                         <span>{row.label}</span>
                       </span>
                     </button>
@@ -1205,8 +1204,7 @@
               {#each remoteTree as row (row.key)}
                 {#if row.kind === "dir"}
                   <button class="ref-tree-dir" style={`--depth:${row.depth}`} on:click={() => (collapsedRemoteDirs = toggleRefDir(collapsedRemoteDirs, row.key))}>
-                    <span class="tree-chevron">{collapsedRemoteDirs.has(row.key) ? "▸" : "▾"}</span>
-                    <i class="tree-folder-icon">{row.depth === 0 ? "☁" : "◫"}</i>
+                    <svg class="tree-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>
                     <span>{row.label}</span>
                   </button>
                 {:else}
@@ -1217,7 +1215,7 @@
                     on:click={() => execute({ kind: "checkoutRemote", target: row.item }, `Checkout ${row.item}`)}
                     disabled={busy}
                   >
-                    <span class="branch-name-line"><i class="branch-glyph">⑂</i> <span>{row.label}</span></span>
+                    <span class="branch-name-line"><svg class="tree-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15" /><circle cx="18" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><path d="M18 9a9 9 0 0 1-9 9" /></svg> <span>{row.label}</span></span>
                   </button>
                 {/if}
               {:else}
@@ -1644,9 +1642,8 @@
 
               {#if commitDetail.refs.length}
                 <div class="detail-refs">
-                  {#each commitDetail.refs as ref}
-                    <span class="ref-pill" style="--ref-color:#26c6da">{ref.replace(/^HEAD -> /, "")}</span>
-                  {/each}
+                  <span class="detail-refs-label">refs</span>
+                  {commitDetail.refs.map((ref) => ref.replace(/^HEAD -> /, "")).join(", ")}
                 </div>
               {/if}
 
