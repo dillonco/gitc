@@ -924,7 +924,7 @@ function runInteractiveRebase(base: string, steps: RebaseStep[]): GitResult {
   if (demo.merging || demo.rebasing) return fail("a rebase or merge is already in progress");
   if (demo.files.length > 0) return fail("commit or stash your changes before rebasing");
 
-  const baseIndex = resolveDemoRef(base);
+  const baseIndex = resolveDemoRefIndex(base);
   if (baseIndex === -1) return fail(`unknown ref '${base}'`);
 
   const range = demoCommits.slice(0, baseIndex); // newest first

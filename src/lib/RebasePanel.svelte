@@ -43,6 +43,10 @@
   let resultLabel = "";
 
   $: branchNames = branches.map((branch) => branch.name);
+  // `base` can be a full commit hash (opened via "Rebase onto this"), not
+  // just a branch name -- never show the raw value in copy, only in the
+  // <select>'s bound value and the actual API calls.
+  $: baseLabel = base && !branchNames.includes(base) ? base.slice(0, 8) : base;
   $: title = mode === "interactive" ? "Interactive Rebase" : "Rebase";
   $: firstLiveIndex = rows.findIndex((row) => row.action !== "drop");
   $: planIssue = (() => {
@@ -57,7 +61,7 @@
   $: primaryLabel =
     mode === "interactive"
       ? `Rewrite ${rows.length} Commit${rows.length === 1 ? "" : "s"}`
-      : `Rebase onto ${base || "…"}`;
+      : `Rebase onto ${baseLabel || "…"}`;
   $: busyLabel = mode === "interactive" ? "Rewriting…" : "Rebasing…";
   $: canStart =
     !busy &&
@@ -194,7 +198,7 @@
 
       if (result.ok) {
         runResult = result;
-        resultLabel = `Rebased ${plan.commits.length} commit${plan.commits.length === 1 ? "" : "s"} onto ${base}`;
+        resultLabel = `Rebased ${plan.commits.length} commit${plan.commits.length === 1 ? "" : "s"} onto ${baseLabel}`;
       } else {
         // A real conflict leaves `state.rebasing` true; the existing
         // merge/rebase banner + continue/abort own that path, and this
@@ -356,7 +360,7 @@
 
         <div aria-live="polite">
           {#if loading}
-            <p class="empty">Loading commits since {base || "…"}…</p>
+            <p class="empty">Loading commits since {baseLabel || "…"}…</p>
           {:else if plan?.inProgress}
             <div class="preflight-banner" role="status">
               A rebase or merge is already in progress — finish or abort it first.
@@ -367,12 +371,12 @@
               <button type="button" on:click={stashChanges} disabled={busy}>Stash Changes</button>
             </div>
           {:else if plan && plan.commits.length === 0}
-            <p class="empty">{currentBranch} has no commits that aren't already on {base}.</p>
+            <p class="empty">{currentBranch} has no commits that aren't already on {baseLabel}.</p>
           {/if}
         </div>
 
         {#if plan && plan.commits.length > 0 && !plan.inProgress && plan.clean}
-          <p class="rebase-hint">Oldest first — applied top to bottom onto {base}</p>
+          <p class="rebase-hint">Oldest first — applied top to bottom onto {baseLabel}</p>
           <div class="rebase-list" role="list">
             {#each rows as row, index (row.hash)}
               <!-- svelte-ignore a11y_no_noninteractive_tabindex -- roving tabindex over a role="list"/"listitem" composite (REVIEW-UX.md 6/2.11) is a standard ARIA pattern the linter doesn't recognize. -->
@@ -467,7 +471,7 @@
         <span class="footer-tertiary">
           {mode === "interactive"
             ? `Rewrite ${rows.length} commits on ${currentBranch}? History changes; the previous state stays available as ORIG_HEAD until your next rebase, merge or reset.`
-            : `Rebase ${currentBranch} onto ${base}? Commits are replayed on top of ${base}.`}
+            : `Rebase ${currentBranch} onto ${baseLabel}? Commits are replayed on top of ${baseLabel}.`}
         </span>
         <button type="button" on:click={() => (confirmingStart = false)} disabled={busy}>Cancel</button>
         <button
