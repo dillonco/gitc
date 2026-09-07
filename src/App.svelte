@@ -122,11 +122,12 @@
   let searchOpen = false;
   let searchQuery = "";
   let sortAsc = true;
-  let localOpen = true;
+  let localOpen = false;
   let remoteOpen = false;
-  let stashesOpen = true;
+  let stashesOpen = false;
   let tagsOpen = false;
-  let worktreesOpen = true;
+  let worktreesOpen = false;
+  let sidebarMode: "list" | "agents" = "list";
   let cleanupOpen = false;
   let unstagedOpen = true;
   let stagedOpen = true;
@@ -159,9 +160,9 @@
     "merge",
   ]);
   const graphColors = [
-    "#26c6da",
-    "#2f80ed",
-    "#c33cff",
+    "#14a0bf",
+    "#036af7",
+    "#8e00c2",
     "#f33bd2",
     "#f94144",
     "#ff7a45",
@@ -179,6 +180,8 @@
   $: conflicted = grouped(state, "conflicted");
   $: currentBranch = state?.currentBranch || "detached";
   $: totalChanges = state?.files.length ?? 0;
+  $: wipModified = unstaged.length;
+  $: wipAdded = untracked.length + staged.filter((file) => file.index === "A").length;
   $: repoName = state?.root.split("/").filter(Boolean).at(-1) ?? "gitc";
   $: accountName = state?.userName?.trim() || "Local";
   $: fullCommitMessage = commitDescription.trim()
@@ -584,6 +587,14 @@
     );
   }
 
+  function isHeadRow(row: GraphRow) {
+    return !!state && row.commit.shortHash === state.head;
+  }
+
+  function isWorktreeBranch(name: string) {
+    return (state?.worktrees ?? []).some((worktree) => worktree.branch === name);
+  }
+
   function buildGraphRows(nodes: CommitNode[]): GraphRow[] {
     const lanes: string[] = [];
     const rows: GraphRow[] = [];
@@ -978,24 +989,110 @@
 
   {#if centerMode !== "launchpad"}
     <aside class="left-panel">
-      <div class="panel-header">
-        <span class="panel-title">Repository</span>
-        <span class="panel-count">{(state?.branches.length ?? 0) + (state?.remoteBranches.length ?? 0)} refs</span>
+      <div class="left-panel-header">
+        <button class="back-btn" title="Back" aria-label="Back">‹</button>
+        <div class="mode-segmented" role="tablist">
+          <button class:active={sidebarMode === "list"} on:click={() => (sidebarMode = "list")}>☰ List</button>
+          <button class:active={sidebarMode === "agents"} on:click={() => (notice = "Agents is coming soon")}>🤖 Agents</button>
+        </div>
       </div>
+      <div class="viewing-row">Viewing <strong>{filteredBranches.length + filteredRemoteBranches.length}</strong></div>
       <div class="filter-block">
-        <input
-          aria-label="Filter refs"
-          bind:this={filterInput}
-          bind:value={searchQuery}
-          placeholder="Filter refs (⌘ + Option + F)"
-        />
+        <div class="filter-input-wrap">
+          <input
+            aria-label="Filter refs"
+            bind:this={filterInput}
+            bind:value={searchQuery}
+            placeholder="Filter (⌘ + Option + f)"
+          />
+          <span class="filter-icon">⌕</span>
+        </div>
       </div>
 
       <div class="nav-scroll">
         <section class="nav-section">
           <div class="section-head">
+            <button class="nav-row" on:click={() => (localOpen = !localOpen)}>
+              <span class="nav-chevron">{localOpen ? "⌄" : "›"}</span>
+              <i class="nav-icon">⌂</i>
+              <span class="nav-label">Local</span>
+              <strong>{state?.branches.length ?? 0}</strong>
+            </button>
+            <button
+              class="section-action"
+              title="Delete merged, squash-merged and gone branches…"
+              on:click={() => (cleanupOpen = true)}
+              disabled={busy}
+            >clean up</button>
+          </div>
+          {#if localOpen}
+            <div class="branch-list">
+              {#each filteredBranches as branch}
+                <div class="branch-row" class:active={branch.current}>
+                  <button
+                    class="branch-name"
+                    on:click={() => execute({ kind: "checkoutBranch", branch: branch.name }, `Checkout ${branch.name}`)}
+                    disabled={busy || branch.current}
+                  >
+                    <span>{branch.current ? "✓" : " "} {branch.name}</span>
+                    {#if branch.upstream || branch.upstreamGone}
+                      <small>
+                        {branch.upstreamGone ? `${branch.upstream ?? "upstream"} · gone` : branch.upstream}
+                        {#if branch.ahead || branch.behind}↑{branch.ahead} ↓{branch.behind}{/if}
+                      </small>
+                    {/if}
+                  </button>
+                  {#if !branch.current}
+                    <button
+                      class="row-action"
+                      title={`Rebase ${currentBranch} onto ${branch.name}`}
+                      on:click={() => rebaseOnto(branch.name)}
+                      disabled={busy}
+                    >⤴</button>
+                    <button
+                      class="row-action danger"
+                      title={`Delete ${branch.name}`}
+                      on:click={() => deleteBranch(branch.name)}
+                      disabled={busy}
+                    >×</button>
+                  {/if}
+                </div>
+              {/each}
+            </div>
+          {/if}
+        </section>
+
+        <section class="nav-section">
+          <button class="nav-row" on:click={() => (remoteOpen = !remoteOpen)}>
+            <span class="nav-chevron">{remoteOpen ? "⌄" : "›"}</span>
+            <i class="nav-icon">☁</i>
+            <span class="nav-label">Remote</span>
+            <strong>{state?.remoteBranches.length ?? 0}</strong>
+          </button>
+          {#if remoteOpen}
+            <div class="branch-list">
+              {#each filteredRemoteBranches as branch}
+                <button
+                  class="branch-name"
+                  title={`Checkout tracking branch for ${branch}`}
+                  on:click={() => execute({ kind: "checkoutRemote", target: branch }, `Checkout ${branch}`)}
+                  disabled={busy}
+                >
+                  <span>☁ {branch}</span>
+                </button>
+              {:else}
+                <p class="empty">No remote branches</p>
+              {/each}
+            </div>
+          {/if}
+        </section>
+
+        <section class="nav-section">
+          <div class="section-head">
             <button class="nav-row" on:click={() => (worktreesOpen = !worktreesOpen)}>
-              <span>{worktreesOpen ? "⌄" : "›"} ⧉ WORKTREES</span>
+              <span class="nav-chevron">{worktreesOpen ? "⌄" : "›"}</span>
+              <i class="nav-icon">⧉</i>
+              <span class="nav-label">Worktrees</span>
               <strong>{state?.worktrees.length ?? 0}</strong>
             </button>
             {#if (state?.worktrees ?? []).some((entry) => entry.prunable)}
@@ -1045,82 +1142,36 @@
           {/if}
         </section>
 
-        <section class="nav-section">
-          <div class="section-head">
-            <button class="nav-row" on:click={() => (localOpen = !localOpen)}>
-              <span>{localOpen ? "⌄" : "›"} ⌂ LOCAL</span>
-              <strong>{state?.branches.length ?? 0}</strong>
-            </button>
-            <button
-              class="section-action"
-              title="Delete merged, squash-merged and gone branches…"
-              on:click={() => (cleanupOpen = true)}
-              disabled={busy}
-            >clean up</button>
-          </div>
-          {#if localOpen}
-            <div class="branch-list">
-              {#each filteredBranches as branch}
-                <div class="branch-row" class:active={branch.current}>
-                  <button
-                    class="branch-name"
-                    on:click={() => execute({ kind: "checkoutBranch", branch: branch.name }, `Checkout ${branch.name}`)}
-                    disabled={busy || branch.current}
-                  >
-                    <span>{branch.current ? "✓" : " "} {branch.name}</span>
-                    {#if branch.upstream || branch.upstreamGone}
-                      <small>
-                        {branch.upstreamGone ? `${branch.upstream ?? "upstream"} · gone` : branch.upstream}
-                        {#if branch.ahead || branch.behind}↑{branch.ahead} ↓{branch.behind}{/if}
-                      </small>
-                    {/if}
-                  </button>
-                  {#if !branch.current}
-                    <button
-                      class="row-action"
-                      title={`Rebase ${currentBranch} onto ${branch.name}`}
-                      on:click={() => rebaseOnto(branch.name)}
-                      disabled={busy}
-                    >⤴</button>
-                    <button
-                      class="row-action danger"
-                      title={`Delete ${branch.name}`}
-                      on:click={() => deleteBranch(branch.name)}
-                      disabled={busy}
-                    >×</button>
-                  {/if}
-                </div>
-              {/each}
-            </div>
-          {/if}
-        </section>
-
-        <section class="nav-section">
-          <button class="nav-row" on:click={() => (remoteOpen = !remoteOpen)}>
-            <span>{remoteOpen ? "⌄" : "›"} ☁ REMOTE</span>
-            <strong>{state?.remoteBranches.length ?? 0}</strong>
-          </button>
-          {#if remoteOpen}
-            <div class="branch-list">
-              {#each filteredRemoteBranches as branch}
-                <button
-                  class="branch-name"
-                  title={`Checkout tracking branch for ${branch}`}
-                  on:click={() => execute({ kind: "checkoutRemote", target: branch }, `Checkout ${branch}`)}
-                  disabled={busy}
-                >
-                  <span>☁ {branch}</span>
-                </button>
-              {:else}
-                <p class="empty">No remote branches</p>
-              {/each}
-            </div>
-          {/if}
-        </section>
+        <button class="nav-row disabled-row" disabled title="Cloud Patches (coming soon)">
+          <span class="nav-chevron">›</span>
+          <i class="nav-icon">☁</i>
+          <span class="nav-label">Cloud Patches</span>
+          <strong>0</strong>
+        </button>
+        <button class="nav-row disabled-row" disabled title="Pull Requests (coming soon)">
+          <span class="nav-chevron">›</span>
+          <i class="nav-icon">⇄</i>
+          <span class="nav-label">Pull Requests</span>
+          <strong>0</strong>
+        </button>
+        <button class="nav-row disabled-row" disabled title="Issues (coming soon)">
+          <span class="nav-chevron">›</span>
+          <i class="nav-icon">◎</i>
+          <span class="nav-label">Issues</span>
+          <strong>0</strong>
+        </button>
+        <button class="nav-row disabled-row" disabled title="Teams (coming soon)">
+          <span class="nav-chevron">›</span>
+          <i class="nav-icon">◈</i>
+          <span class="nav-label">Teams</span>
+          <strong>0</strong>
+        </button>
 
         <section class="nav-section">
           <button class="nav-row" on:click={() => (stashesOpen = !stashesOpen)}>
-            <span>{stashesOpen ? "⌄" : "›"} ▤ STASHES</span>
+            <span class="nav-chevron">{stashesOpen ? "⌄" : "›"}</span>
+            <i class="nav-icon">▤</i>
+            <span class="nav-label">Stashes</span>
             <strong>{state?.stashes.length ?? 0}</strong>
           </button>
           {#if stashesOpen}
@@ -1146,7 +1197,9 @@
 
         <section class="nav-section">
           <button class="nav-row" on:click={() => (tagsOpen = !tagsOpen)}>
-            <span>{tagsOpen ? "⌄" : "›"} ⌖ TAGS</span>
+            <span class="nav-chevron">{tagsOpen ? "⌄" : "›"}</span>
+            <i class="nav-icon">⌖</i>
+            <span class="nav-label">Tags</span>
             <strong>{state?.tags.length ?? 0}</strong>
           </button>
           {#if tagsOpen}
@@ -1336,13 +1389,16 @@
       </div>
     {:else}
       <div class="graph-head">
-        <span>BRANCH / TAG</span>
-        <span>GRAPH</span>
-        <span>COMMIT MESSAGE</span>
+        <span>Branch / Tag</span>
+        <span>Graph</span>
+        <span>
+          Commit Message
+          <button class="graph-settings" title="Settings" on:click={() => (settingsOpen = true)}>⚙</button>
+        </span>
       </div>
       <div class="graph-scroll">
         <div class="wip-row">
-          <div class="branch-chip">✓ {currentBranch}</div>
+          <div class="branch-cell"></div>
           <div class="wip-graph">
             <span class="wip-rail"></span>
             <span class="wip-node"></span>
@@ -1353,7 +1409,9 @@
             </button>
             <span class="wip-count" title={`${totalChanges} WIP file changes`}>
               <span class="wip-pencil">✎</span>
-              <strong>{totalChanges}</strong>
+              <strong>{wipModified}</strong>
+              <span class="wip-added">+</span>
+              <strong>{wipAdded}</strong>
             </span>
           </div>
         </div>
@@ -1366,13 +1424,21 @@
           >
             <span class="branch-cell" title={row.labels.join("  ")}>
               {#if row.labels.length}
-                <span class="ref-pill" style={`--ref-color:${row.color}`}>{row.labels[0]}</span>
+                <span class="ref-pill" class:head={isHeadRow(row) && row.labels[0] === currentBranch} style={`--ref-color:${row.color}`}>
+                  {#if isHeadRow(row) && row.labels[0] === currentBranch}<i class="pill-check">✓</i>{/if}
+                  <span class="pill-label">{row.labels[0]}</span>
+                  {#if isWorktreeBranch(row.labels[0])}<i class="pill-worktree">💻</i>{:else}<i class="pill-branch">⑂</i>{/if}
+                </span>
                 {#if row.labels.length > 1}
                   <span class="ref-pill more-pill" style={`--ref-color:${row.color}`}>+{row.labels.length - 1}</span>
                 {/if}
               {/if}
             </span>
             <span class="graph-cell" style={`--lane-count:${graphLaneCount}`}>
+              <span class="graph-tint" style={`--lane:${row.lane}; --lane-color:${row.color}`}></span>
+              {#if row.labels.length}
+                <span class="ref-link" class:head={isHeadRow(row)} style={`--lane:${row.lane}; --lane-color:${row.color}`}></span>
+              {/if}
               {#each row.lanes as lane}
                 <span
                   class="graph-rail"
@@ -1389,7 +1455,9 @@
                   style={`--from:${Math.min(edge.from, edge.to)}; --span:${Math.abs(edge.to - edge.from) || 1}; --lane-color:${edge.color}`}
                 ></span>
               {/each}
-              <span class="commit-dot" style={`--lane:${row.lane}; --lane-color:${row.color}`}>{authorInitials(row.commit.author)}</span>
+              <span class="commit-dot" style={`--lane:${row.lane}; --lane-color:${row.color}`}>
+                {#if row.commit.parents.length > 1}<i class="merge-glyph">≡</i>{:else}{authorInitials(row.commit.author)}{/if}
+              </span>
             </span>
             <span class="commit-main">
               <strong>
@@ -1494,10 +1562,10 @@
             disabled={!selectedFile}
           >⌫</button>
           <strong>{totalChanges} file changes on <span>{currentBranch}</span></strong>
-          <button title="Refresh" on:click={refresh} disabled={busy}>✦</button>
+          <button class="ai-header-btn ai-btn" title="Refresh" on:click={refresh} disabled={busy}>✦</button>
         </div>
         <div class="changes-tools">
-          <button on:click={() => (sortAsc = !sortAsc)}>↕ {sortAsc ? "A Z" : "Z A"}</button>
+          <button class="sort-btn" title={sortAsc ? "Sorted A to Z" : "Sorted Z to A"} on:click={() => (sortAsc = !sortAsc)}>⇅<i>{sortAsc ? "AZ" : "ZA"}</i></button>
           <div class="segmented">
             <button class:active={rightTab === "path"} on:click={() => (rightTab = "path")}>☰ Path</button>
             <button class:active={rightTab === "tree"} on:click={() => (rightTab = "tree")}>⌘ Tree</button>
@@ -1507,7 +1575,8 @@
         <div class="change-list">
           <div class="change-group-head">
             <button class="section-toggle" on:click={() => (unstagedOpen = !unstagedOpen)}>
-              <span>{unstagedOpen ? "⌄" : "›"} Unstaged Files ({unstaged.length + untracked.length + conflicted.length})</span>
+              <span class="chevron">{unstagedOpen ? "▾" : "▸"}</span>
+              <span>Unstaged Files ({unstaged.length + untracked.length + conflicted.length})</span>
             </button>
             <button on:click={() => execute({ kind: "stage", path: "." }, "Stage all changes")} disabled={busy || totalChanges === staged.length}>
               Stage All Changes
@@ -1520,10 +1589,11 @@
           {/if}
           <div class="change-group-head compact">
             <button class="section-toggle" on:click={() => (stagedOpen = !stagedOpen)}>
-              <span>{stagedOpen ? "⌄" : "›"} Staged Files ({staged.length})</span>
+              <span class="chevron">{stagedOpen ? "▾" : "▸"}</span>
+              <span>Staged Files ({staged.length})</span>
             </button>
             <button on:click={() => execute({ kind: "unstage", path: "." }, "Unstage all changes")} disabled={busy || staged.length === 0}>
-              Unstage All
+              Unstage All Changes
             </button>
           </div>
           {#if stagedOpen}
@@ -1532,15 +1602,34 @@
         </div>
 
         <div class="commit-panel">
-          <div class="commit-tab">⌁ Commit</div>
+          <div class="split-handle"></div>
+          <div class="commit-tabs">
+            <button class="commit-tab">-o- Commit</button>
+            <span class="tab-icon" title="Pull request">⤓</span>
+            <span class="tab-icon" title="Cloud patch">☁</span>
+            <span class="tab-icon" title="Compare">⇄</span>
+          </div>
           <label class="checkbox"><input type="checkbox" bind:checked={amendCommit} /> Amend previous commit</label>
-          <label class="commit-input" for="commit-message">
-            <input id="commit-message" bind:value={commitMessage} maxlength="72" placeholder="Commit summary" />
-            <small>{72 - commitMessage.length}</small>
-          </label>
-          <textarea class="description" bind:value={commitDescription} placeholder="Description"></textarea>
+          <div class="commit-box">
+            <label class="commit-input" for="commit-message">
+              <input id="commit-message" bind:value={commitMessage} maxlength="72" placeholder="Commit summary" />
+              <small>{72 - commitMessage.length}</small>
+              <button type="button" class="ai-mini ai-btn" title="Compose with AI" on:click={() => (notice = "Compose with AI is coming soon")}>✦</button>
+            </label>
+            <textarea class="description" bind:value={commitDescription} placeholder="Description"></textarea>
+          </div>
           <details>
-            <summary>Commit options</summary>
+            <summary>
+              <span class="options-toggle"><i>›</i> Commit options</span>
+              <button
+                type="button"
+                class="ai-compose ai-btn"
+                on:click={(event) => {
+                  event.preventDefault();
+                  notice = "Compose with AI is coming soon";
+                }}
+              >✦ Compose commits with AI</button>
+            </summary>
             <div class="field">
               <label for="branch-name">Branch</label>
               <input id="branch-name" bind:value={branchName} placeholder="feature/name" />
@@ -1572,7 +1661,7 @@
             on:click={() => execute({ kind: amendCommit ? "commitAmend" : "commit", message: fullCommitMessage }, amendCommit ? "Amend commit" : "Commit")}
             disabled={busy || !commitMessage.trim() || staged.length === 0}
           >
-            {amendCommit ? "Amend Previous Commit" : "Commit Staged Changes"}
+            {commitMessage.trim() ? (amendCommit ? "Amend Previous Commit" : "Commit Staged Changes") : "-o- Type a Message to Commit"}
           </button>
         </div>
       {/if}

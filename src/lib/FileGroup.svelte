@@ -26,6 +26,15 @@
     return cut === -1 ? path : path.slice(cut + 1);
   }
 
+  function statusGlyph(file: FileStatus): { glyph: string; cls: string } {
+    const code = file.group === "staged" ? file.index : file.worktree !== " " ? file.worktree : file.index;
+    if (file.group === "untracked" || code === "A") return { glyph: "+", cls: "st-add" };
+    if (code === "D") return { glyph: "−", cls: "st-del" };
+    if (code === "U") return { glyph: "!", cls: "st-del" };
+    if (code === "R" || code === "C") return { glyph: "⇝", cls: "st-mod" };
+    return { glyph: "✎", cls: "st-mod" };
+  }
+
   function actionsFor(file: FileStatus) {
     if (file.group === "staged") return [{ kind: "unstage", label: "Unstage" }];
     if (file.group === "conflicted") return [{ kind: "markResolved", label: "Mark Resolved" }];
@@ -95,7 +104,7 @@
         {:else if row.file}
           <div class="file-row tree-row" class:active={selectedPath === row.file.path} style={`--depth:${row.depth}`}>
             <button class="file-name tree-file" on:click={() => row.file && open(row.file)} title={row.file.path}>
-              <span>{row.file.index}{row.file.worktree}</span>
+              <span class={statusGlyph(row.file).cls}>{statusGlyph(row.file).glyph}</span>
               <strong>{row.name}</strong>
             </button>
             <div class="file-actions">
@@ -117,7 +126,7 @@
       {#each files as file}
         <div class="file-row" class:active={selectedPath === file.path}>
           <button class="file-name" on:click={() => open(file)} title={file.path}>
-            <span>{file.index}{file.worktree}</span>
+            <span class={statusGlyph(file).cls}>{statusGlyph(file).glyph}</span>
             <strong>{#if dirOf(file.path)}<i>{dirOf(file.path)}</i>{/if}{baseOf(file.path)}</strong>
           </button>
           <div class="file-actions">
