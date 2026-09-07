@@ -189,7 +189,9 @@ p {
 .shell {
   display: grid;
   grid-template-columns: 362px minmax(420px, 1fr) 351px;
-  grid-template-rows: 36px 40px minmax(0, 1fr) 24px;
+  /* 52px: the repo/branch stack and the icon-over-label toolbar buttons
+     both need ~51px, and a 40px row clipped them. */
+  grid-template-rows: 36px 52px minmax(0, 1fr) 24px;
   width: 100vw;
   height: 100vh;
   overflow: hidden;
