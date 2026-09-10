@@ -40,6 +40,10 @@ export function getCommitDetail(hash: string): Promise<CommitDetail> {
   return call("get_commit_detail", { hash });
 }
 
+export function getCommitTree(hash: string): Promise<string[]> {
+  return call("get_commit_tree", { hash });
+}
+
 export function getCommitFileDiff(hash: string, path: string): Promise<FileDiff> {
   return call("get_commit_file_diff", { hash, path });
 }

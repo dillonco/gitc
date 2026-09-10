@@ -54,6 +54,7 @@ function commit(
     refs,
     author: author.name,
     email: author.email,
+    timestamp: Math.floor(Date.parse(date.replace(" ", "T")) / 1000),
     relativeDate,
     date,
     subject,
@@ -487,6 +488,7 @@ function repositoryState(): RepositoryState {
     files: demo.files.map((entry) => ({ ...entry })),
     branches: demo.branches.map((entry) => ({ ...entry })),
     remotes: ["origin"],
+    remoteUrls: { origin: "git@github.com:wareness/gitc.git" },
     remoteBranches: ["origin/main", "origin/feature/commit-details", "origin/release/0.2"],
     tags: [...demo.tags],
     worktrees: demo.worktrees.map((entry) => ({ ...entry, current: entry.path === demo.root })),
@@ -639,7 +641,7 @@ function runAction(action: GitAction): GitResult {
         );
       }
       demo.branches = demo.branches.filter((entry) => entry.name !== action.branch);
-      return ok();
+      return ok(`Deleted branch ${branch.name} (was ${demoBranchHead(branch.name).slice(0, 7)}).`);
     }
     case "checkoutRemote": {
       const local = (action.target ?? "").split("/").slice(1).join("/") || "tracked";
@@ -659,8 +661,12 @@ function runAction(action: GitAction): GitResult {
       demo.tags = [action.branch ?? "tag", ...demo.tags];
       return ok();
     case "deleteTag":
+    {
+      if (!demo.tags.includes(action.branch ?? "")) return fail(`error: tag '${action.branch}' not found.`);
       demo.tags = demo.tags.filter((tag) => tag !== action.branch);
-      return ok();
+      const tagged = demoCommits.find((entry) => entry.refs.includes(`tag:${action.branch}`));
+      return ok(`Deleted tag '${action.branch}' (was ${(tagged?.hash ?? h(0x2f)).slice(0, 7)})`);
+    }
     case "stashCreate":
       demo.stashes = [
         { name: "stash@{0}", message: `On ${demo.currentBranch || "HEAD"}: ${action.message ?? "gitc stash"}` },
@@ -760,9 +766,17 @@ function runAction(action: GitAction): GitResult {
       demo.worktrees = demo.worktrees.filter((entry) => !entry.prunable);
       return ok(pruned.map((entry) => `Removing worktrees/${entry.path.split("/").at(-1)}: gitdir file points to non-existent location`).join("\n"));
     }
+    case "branchAt":
+      if (demo.branches.some((entry) => entry.name === action.branch)) {
+        return fail(`fatal: a branch named '${action.branch}' already exists`);
+      }
+      demo.branches = [...demo.branches, newDemoBranch(action.branch ?? "branch", false, null)];
+      return ok();
     case "fetch":
     case "fetchAll":
     case "pull":
+    case "pullMerge":
+    case "pullRebase":
     case "push":
     case "forcePush":
     case "rebase":
@@ -812,7 +826,7 @@ function demoMergeBase(aHash: string, bHash: string): string | null {
   return common?.hash ?? null;
 }
 
-function asCommitNode({ email, date, body, files, ...node }: DemoCommit): CommitNode {
+function asCommitNode({ date, body, files, ...node }: DemoCommit): CommitNode {
   return { ...node };
 }
 
@@ -861,7 +875,7 @@ function resolveDemoRefIndex(ref: string): number {
 }
 
 function toRebaseCommitNode(entry: DemoCommit): CommitNode {
-  const { email, date, body, files, ...node } = entry;
+  const { date, body, files, ...node } = entry;
   return { ...node };
 }
 
@@ -992,7 +1006,7 @@ export async function demoInvoke<T>(command: string, args: Record<string, unknow
     case "get_repository_state":
       return repositoryState() as T;
     case "get_commit_graph":
-      return { commits: demoCommits.map(({ email, date, body, files, ...node }) => ({ ...node })) } as T;
+      return { commits: demoCommits.map(({ date, body, files, ...node }) => ({ ...node })) } as T;
     case "get_commit_detail": {
       const found = demoCommits.find((entry) => entry.hash === args.hash);
       if (!found) throw new Error(`unknown commit ${String(args.hash)}`);
@@ -1003,7 +1017,8 @@ export async function demoInvoke<T>(command: string, args: Record<string, unknow
         refs: found.refs,
         author: found.author,
         email: found.email,
-        date: found.date,
+        // Same shape as the backend's "%d/%m/%Y @ %H:%M".
+        date: found.date.replace(/^(\d{4})-(\d{2})-(\d{2}) (\S+)$/, "$3/$2/$1 @ $4"),
         relativeDate: found.relativeDate,
         subject: found.subject,
         body: found.body,
@@ -1011,6 +1026,8 @@ export async function demoInvoke<T>(command: string, args: Record<string, unknow
       };
       return detail as T;
     }
+    case "get_commit_tree":
+      return [...new Set(demoCommits.flatMap((entry) => entry.files.map((change) => change.path)))].sort() as T;
     case "get_commit_file_diff": {
       const diff = demoDiffs[String(args.path)] ?? demoDiffs["docs/roadmap.md"];
       return { path: args.path, staged: false, diff, binary: false } as FileDiff as T;

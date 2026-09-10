@@ -314,13 +314,30 @@ p {
   color: inherit;
   font-size: 18px;
   line-height: 1;
-  opacity: 0.75;
+  opacity: 0;
   padding: 0;
 }
 
-.tab-close:hover {
+/* Only the active tab, or the one under the pointer, shows its close button. */
+.tab.active + .tab-close,
+.tab-wrap:hover .tab-close {
+  opacity: 0.75;
+}
+
+.tab-wrap .tab-close:hover {
   background: transparent;
   opacity: 1;
+}
+
+.tab-icon {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  color: var(--ink-dim);
+}
+
+.tab.active .tab-icon {
+  color: inherit;
 }
 
 .add-tab {
@@ -462,6 +479,88 @@ p {
   width: 17px;
   height: 17px;
   color: #e8ecf1;
+}
+
+/* A rule between the repository commands and Terminal. */
+.toolbar-sep {
+  align-self: center;
+  width: 1px;
+  height: 36px;
+  margin: 0 8px;
+  background: #5c5f66;
+}
+
+/* Pull runs the saved mode; the caret beside it opens the other modes. */
+.pull-split {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+
+.top-actions .pull-split > button:first-child {
+  padding-right: 2px;
+}
+
+.top-actions .pull-caret {
+  min-width: 0;
+  padding: 0 6px 0 0;
+}
+
+.caret-icon {
+  width: 10px;
+  height: 10px;
+  margin-bottom: 12px;
+  color: var(--ink-dim);
+}
+
+.pull-caret:hover:not(:disabled) .caret-icon,
+.pull-caret.active .caret-icon {
+  color: #e8ecf1;
+}
+
+.pull-menu {
+  left: 0;
+  right: auto;
+  min-width: 250px;
+}
+
+.pull-menu .menu-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.pull-menu .menu-row button:last-child {
+  flex: 1;
+}
+
+.top-actions .pull-menu .menu-plain {
+  padding-left: 34px;
+}
+
+/* The radio beside each mode picks what the Pull button itself runs. */
+.top-actions .pull-menu .menu-default {
+  position: relative;
+  flex: none;
+  width: 30px;
+  padding: 0;
+}
+
+.menu-default::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 11px;
+  height: 11px;
+  transform: translate(-50%, -50%);
+  border: 1.5px solid var(--ink-dim);
+  border-radius: 50%;
+}
+
+.menu-default.checked::after {
+  border-color: var(--teal);
+  background: radial-gradient(circle, var(--teal) 0 2.5px, transparent 3px);
 }
 
 .top-actions .dropdown-menu button,
@@ -1491,23 +1590,18 @@ small {
   font-style: normal;
 }
 
-.ref-pill .pill-worktree {
+/* Where the ref lives: laptop for a local branch, tree for one checked out
+   in another worktree, cloud for a remote copy, tag for a tag. A branch
+   with a remote copy on the same commit carries both. */
+.ref-pill .pill-icon {
   flex: none;
-  font-size: 12px;
-  font-style: normal;
-}
-
-.ref-pill .pill-branch {
-  flex: none;
-  display: inline-grid;
-  place-items: center;
   width: 14px;
   height: 14px;
-  border-radius: 50%;
-  background: #0b1d2c;
-  color: var(--ref-color);
-  font-size: 10px;
-  font-style: normal;
+  color: #c6cfd1;
+}
+
+.ref-pill.head .pill-icon {
+  color: #fff;
 }
 
 .graph-cell {
@@ -1603,9 +1697,50 @@ small {
   letter-spacing: 0;
 }
 
-.commit-dot .merge-glyph {
-  font-size: 10px;
-  font-style: normal;
+/* A lane that ends at this commit: down its own column, then a rounded turn
+   into the node. Only lanes to the node's right end here, because the node
+   always takes the leftmost lane that was waiting for it. */
+.graph-join {
+  position: absolute;
+  top: -2px;
+  /* down to the node's centre line, plus 1px so the 2px bottom border straddles it */
+  height: calc(50% + 3px);
+  left: calc(var(--lane-center) + var(--from) * var(--lane-pitch));
+  z-index: 2;
+  width: calc(var(--span) * var(--lane-pitch) + 1px);
+  border-right: 2px solid var(--lane-color);
+  border-bottom: 2px solid var(--lane-color);
+  border-bottom-right-radius: 11px;
+}
+
+/* Merges carry no author, so they draw as a small solid dot. */
+.commit-dot.merge {
+  width: 12px;
+  height: 12px;
+  border: 0;
+  background: var(--lane-color);
+}
+
+.commit-dot img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* The checked-out commit's row stands out the whole way across. */
+.commit-row.head .graph-tint {
+  background: color-mix(in srgb, var(--lane-color) 30%, #1c1e24);
+}
+
+.commit-row.head .commit-main {
+  background: color-mix(in srgb, var(--row-color) 30%, #1c1e24);
+}
+
+.commit-row.head .commit-main strong {
+  color: #fff;
 }
 
 .commit-main {
@@ -1617,17 +1752,10 @@ small {
   padding: 0 7px;
 }
 
-/* A row that carries a .date-marker floats it over the row's own top-right
-   corner (see .date-marker below), so the message text needs to stop short
-   of it — otherwise a long subject's ellipsis lands directly under the
-   badge instead of clearing it. */
 .commit-main strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.commit-main strong {
   display: flex;
   min-width: 0;
   gap: 10px;
@@ -1671,12 +1799,27 @@ small {
   }
 }
 
+/* Where the date bucket changes, a hairline runs across the row's top edge
+   with the new bucket's label sitting on it at the right. */
+.commit-row.date-break::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
 .date-marker {
-  /* In flow (so it reserves exactly its own width) but pulled up half a
-     row, so it still sits on the boundary between rows. */
-  position: relative;
-  top: -14px;
-  flex: none;
+  /* Absolute on .commit-main, not inside the message: that element clips
+     its overflow, which cut the label pulled up onto the boundary down to
+     an empty grey sliver. */
+  position: absolute;
+  top: 0;
+  right: 8px;
+  transform: translateY(-50%);
   z-index: 4;
   border-radius: var(--radius);
   background: #34363d;
@@ -2038,6 +2181,29 @@ small {
   font-size: 8px;
   font-style: normal;
   line-height: 1;
+}
+
+/* The commit panel's row carries a third control, so instead of centring
+   Path/Tree it groups them with "View all files" at the right. */
+.commit-detail .changes-tools {
+  justify-content: flex-end;
+  gap: 14px;
+  padding-right: 12px;
+}
+
+.view-all-files {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.view-all-files input {
+  width: 13px;
+  height: 13px;
+  margin: 0;
 }
 
 .segmented {
@@ -2691,17 +2857,6 @@ summary::-webkit-details-marker {
   white-space: nowrap;
 }
 
-.commit-detail-close {
-  flex: none;
-  width: 22px;
-  min-height: 22px;
-  border: 0;
-  padding: 0;
-  color: var(--ink-dim);
-  font-size: 15px;
-  line-height: 1;
-}
-
 .commit-detail-scroll {
   min-width: 0;
   min-height: 0;
@@ -2754,18 +2909,28 @@ summary::-webkit-details-marker {
   padding: 10px 2px 0;
 }
 
+/* A rounded square for the author here (the graph keeps circles). */
 .author-badge {
+  position: relative;
   display: grid;
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   flex: none;
   place-items: center;
-  border: 2px solid var(--teal);
-  border-radius: 50%;
-  background: rgba(110, 168, 254, 0.1);
+  overflow: hidden;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--teal) 30%, #1c1e24);
   color: #e8ecf1;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 650;
+}
+
+.author-badge img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .commit-author-main {
@@ -2803,22 +2968,25 @@ summary::-webkit-details-marker {
   font-weight: 500;
 }
 
-/* Not in the reference at all (it shows co-author avatars here, a feature
-   we don't have) — kept as real information (which refs point at this
-   commit is genuine, useful data) but demoted to a quiet caption line
-   instead of a row of bright .ref-pill chips competing with the author
-   line right above it. */
-.detail-refs {
-  overflow: hidden;
-  padding: 4px 2px 0;
+/* Everyone named in a Co-authored-by trailer, as avatars. */
+.commit-coauthors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 2px 0;
   color: var(--ink-dim);
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 13px;
 }
 
-.detail-refs-label {
-  margin-right: 4px;
+.commit-coauthors span:first-child {
+  margin-right: 2px;
+}
+
+.author-badge.coauthor-badge {
+  width: 24px;
+  height: 24px;
+  font-size: 9px;
 }
 
 .commit-change-summary {
@@ -2945,6 +3113,23 @@ summary::-webkit-details-marker {
   font-weight: 400;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* The folder reads quieter than the file name. */
+.commit-file-row .path-dir {
+  color: var(--ink-dim);
+  font-style: normal;
+}
+
+/* Files the commit didn't touch, shown by "View all files". */
+.commit-file-row.unchanged:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
+.commit-file-row.unchanged strong,
+.commit-file-row.unchanged .path-dir {
+  color: var(--ink-dim);
 }
 
 .modal-backdrop {

@@ -82,6 +82,7 @@ pub struct RepositoryState {
     files: Vec<FileStatus>,
     branches: Vec<Branch>,
     remotes: Vec<String>,
+    remote_urls: std::collections::BTreeMap<String, String>,
     remote_branches: Vec<String>,
     tags: Vec<String>,
     worktrees: Vec<Worktree>,
@@ -97,6 +98,8 @@ pub struct CommitNode {
     parents: Vec<String>,
     refs: Vec<String>,
     author: String,
+    email: String,
+    timestamp: i64,
     relative_date: String,
     subject: String,
     body_summary: String,
@@ -203,6 +206,7 @@ fn repository_state(root: &Path) -> Result<RepositoryState, String> {
             .filter(|line| !line.trim().is_empty())
             .map(ToOwned::to_owned)
             .collect(),
+        remote_urls: parse_remote_urls(&git(&root, &["remote", "-v"])?),
         remote_branches: git(&root, &["branch", "-r", "--format=%(refname:short)"])?
             .lines()
             .map(str::trim)
@@ -227,18 +231,24 @@ fn get_commit_graph(state: State<'_, AppState>, limit: usize) -> Result<CommitGr
     commit_graph(&root, limit)
 }
 
+/// Shared by the graph, compare and rebase logs so `parse_commit_graph` reads all three.
+const COMMIT_LOG_FORMAT: &str = "%H%x1f%P%x1f%D%x1f%an%x1f%ae%x1f%ct%x1f%ar%x1f%s%x1f%b%x1e";
+
 fn commit_graph(root: &Path, limit: usize) -> Result<CommitGraph, String> {
     let limit = limit.clamp(25, 1000).to_string();
+    let format_arg = format!("--format={COMMIT_LOG_FORMAT}");
     // Exclude refs/stash: its synthetic two/three-parent commits render as bogus merges.
+    // --date-order, not --topo-order: topo order runs each branch's commits
+    // together, so parallel work stacks up branch by branch instead of
+    // interleaving by when it happened.
     let out = git(
         root,
         &[
             "log",
             "--exclude=refs/stash",
             "--all",
-            "--topo-order",
-            "--date=relative",
-            "--format=%H%x1f%P%x1f%D%x1f%an%x1f%ar%x1f%s%x1f%b%x1e",
+            "--date-order",
+            &format_arg,
             "-n",
             &limit,
         ],
@@ -262,7 +272,8 @@ fn commit_detail(root: &Path, hash: &str) -> Result<CommitDetail, String> {
         &[
             "show",
             "--no-patch",
-            "--date=format:%Y-%m-%d %H:%M",
+            // "10/09/2026 @ 11:42", in the viewer's time zone.
+            "--date=format-local:%d/%m/%Y @ %H:%M",
             "--format=%H%x1f%P%x1f%D%x1f%an%x1f%ae%x1f%ad%x1f%ar%x1f%s%x1f%b",
             hash,
         ],
@@ -304,6 +315,24 @@ fn commit_detail(root: &Path, hash: &str) -> Result<CommitDetail, String> {
         body: fields[8].trim().to_string(),
         files: parse_name_status(&name_status),
     })
+}
+
+#[tauri::command(async)]
+fn get_commit_tree(state: State<'_, AppState>, hash: String) -> Result<Vec<String>, String> {
+    let root = active_repo(&state)?;
+    commit_tree(&root, &hash)
+}
+
+/// Every file in the commit's tree, for the detail panel's "View all files".
+fn commit_tree(root: &Path, hash: &str) -> Result<Vec<String>, String> {
+    validate_ref_arg(hash)?;
+    let out = git(root, &["ls-tree", "-r", "-z", "--name-only", hash])?;
+    Ok(out
+        .split('\0')
+        .map(|path| path.trim_matches('\n'))
+        .filter(|path| !path.is_empty())
+        .map(ToOwned::to_owned)
+        .collect())
 }
 
 #[tauri::command(async)]
@@ -600,6 +629,7 @@ pub fn run() {
             get_repository_state,
             get_commit_graph,
             get_commit_detail,
+            get_commit_tree,
             get_commit_file_diff,
             run_git_action,
             set_repository_path,
@@ -788,6 +818,8 @@ fn action_args(action: &GitAction) -> Result<Vec<&str>, String> {
         }
         "deleteBranch" => vec!["branch", "-d", required(branch, "branch")?],
         "deleteBranchForce" => vec!["branch", "-D", required(branch, "branch")?],
+        // Create without checking out: how undo restores a deleted branch.
+        "branchAt" => vec!["branch", required(branch, "branch")?, required(target, "target")?],
         "checkoutRemote" => vec!["checkout", "--track", required(target, "target")?],
         "checkoutCommit" => vec!["checkout", "--detach", required(target, "target")?],
         "createTag" => {
@@ -801,6 +833,8 @@ fn action_args(action: &GitAction) -> Result<Vec<&str>, String> {
         "fetch" => vec!["fetch", remote],
         "fetchAll" => vec!["fetch", "--all", "--prune"],
         "pull" => vec!["pull", "--ff-only", remote],
+        "pullMerge" => vec!["pull", "--no-rebase", remote],
+        "pullRebase" => vec!["pull", "--rebase", remote],
         "push" => vec!["push", "-u", remote, "HEAD"],
         "forcePush" => vec!["push", "--force-with-lease", remote, "HEAD"],
         "stashCreate" => vec!["stash", "push", "-u", "-m", message.unwrap_or("gitc stash")],
@@ -1154,6 +1188,22 @@ fn parse_worktrees(out: &str, current_root: &Path) -> Vec<Worktree> {
         .collect()
 }
 
+/// `git remote -v` lists a fetch and a push URL per remote; the fetch URL wins.
+fn parse_remote_urls(out: &str) -> std::collections::BTreeMap<String, String> {
+    let mut urls = std::collections::BTreeMap::new();
+    for line in out.lines() {
+        let Some((name, rest)) = line.split_once('\t') else {
+            continue;
+        };
+        if let Some(url) = rest.strip_suffix(" (fetch)") {
+            urls.insert(name.to_string(), url.to_string());
+        } else if let Some(url) = rest.strip_suffix(" (push)") {
+            urls.entry(name.to_string()).or_insert_with(|| url.to_string());
+        }
+    }
+    urls
+}
+
 fn parse_commit_graph(out: &str) -> Vec<CommitNode> {
     out.split('\u{1e}')
         .filter_map(|record| {
@@ -1162,7 +1212,7 @@ fn parse_commit_graph(out: &str) -> Vec<CommitNode> {
                 return None;
             }
             let fields: Vec<&str> = record.split('\u{1f}').collect();
-            if fields.len() != 7 {
+            if fields.len() != 9 {
                 return None;
             }
             Some(CommitNode {
@@ -1180,9 +1230,11 @@ fn parse_commit_graph(out: &str) -> Vec<CommitNode> {
                     .map(ToOwned::to_owned)
                     .collect(),
                 author: fields[3].to_string(),
-                relative_date: fields[4].to_string(),
-                subject: fields[5].to_string(),
-                body_summary: summarize_commit_body(fields[6]),
+                email: fields[4].to_string(),
+                timestamp: fields[5].trim().parse().unwrap_or(0),
+                relative_date: fields[6].to_string(),
+                subject: fields[7].to_string(),
+                body_summary: summarize_commit_body(fields[8]),
             })
         })
         .collect()
@@ -1428,6 +1480,37 @@ u UU N... 100644 100644 100644 100644 a b c d conflicted.txt";
 
         let pull = action("pull");
         assert_eq!(action_args(&pull).unwrap(), vec!["pull", "--ff-only", "origin"]);
+        assert_eq!(
+            action_args(&action("pullMerge")).unwrap(),
+            vec!["pull", "--no-rebase", "origin"]
+        );
+        assert_eq!(
+            action_args(&action("pullRebase")).unwrap(),
+            vec!["pull", "--rebase", "origin"]
+        );
+    }
+
+    #[test]
+    fn branch_at_creates_without_checkout_and_rejects_options() {
+        let mut restore = action("branchAt");
+        assert!(action_args(&restore).is_err(), "branch and target are required");
+        restore.branch = Some("old".to_string());
+        restore.target = Some("1a2b3c4".to_string());
+        assert_eq!(action_args(&restore).unwrap(), vec!["branch", "old", "1a2b3c4"]);
+        restore.target = Some("--force".to_string());
+        assert!(action_args(&restore).is_err(), "option-like target must be rejected");
+    }
+
+    #[test]
+    fn parses_remote_urls_preferring_fetch() {
+        let out = "origin\tgit@github.com:octo-org/gitc.git (fetch)\n\
+origin\tgit@github.com:octo-org/gitc.git (push)\n\
+mirror\thttps://push.example.com/gitc.git (push)\n\
+mirror\thttps://example.com/gitc.git (fetch)\n";
+        let urls = parse_remote_urls(out);
+        assert_eq!(urls.len(), 2);
+        assert_eq!(urls["origin"], "git@github.com:octo-org/gitc.git");
+        assert_eq!(urls["mirror"], "https://example.com/gitc.git");
     }
 
     #[test]
@@ -1589,6 +1672,52 @@ mod git_integration_tests {
         assert_eq!(graph.commits[1].subject, "first");
         assert_eq!(graph.commits[0].parents.len(), 1);
         assert!(graph.commits[0].refs.iter().any(|r| r.contains("main")));
+        assert_eq!(graph.commits[0].email, "test@gitc.dev");
+    }
+
+    #[test]
+    fn commit_graph_interleaves_branches_by_commit_date() {
+        let repo = TempRepo::new();
+        let commit_at = |message: &str, unix: i64| {
+            write_file(repo.path(), "log.txt", message);
+            run(repo.path(), &["add", "-A"]);
+            let date = format!("{unix} +0000");
+            let result = run_git_env(
+                repo.path(),
+                &["commit", "-m", message],
+                &[("GIT_AUTHOR_DATE", &date), ("GIT_COMMITTER_DATE", &date)],
+            );
+            assert!(result.ok, "commit failed: {}", result.stderr);
+        };
+        let base = 1_767_261_600;
+        commit_at("base", base);
+        run(repo.path(), &["checkout", "-b", "side"]);
+        commit_at("side one", base + 3600);
+        run(repo.path(), &["checkout", "main"]);
+        commit_at("main one", base + 7200);
+        run(repo.path(), &["checkout", "side"]);
+        commit_at("side two", base + 10800);
+
+        let graph = commit_graph(repo.path(), 50).unwrap();
+        let subjects: Vec<&str> = graph.commits.iter().map(|c| c.subject.as_str()).collect();
+        // --topo-order would have kept "side two" and "side one" together.
+        assert_eq!(subjects, vec!["side two", "main one", "side one", "base"]);
+        assert_eq!(graph.commits[1].timestamp, base + 7200);
+    }
+
+    #[test]
+    fn commit_tree_lists_every_file_at_that_commit() {
+        let repo = TempRepo::new();
+        write_file(repo.path(), "a.txt", "one\n");
+        commit_all(repo.path(), "first");
+        std::fs::create_dir_all(repo.path().join("docs")).unwrap();
+        write_file(repo.path(), "docs/b.md", "two\n");
+        commit_all(repo.path(), "second");
+
+        let first = git(repo.path(), &["rev-parse", "HEAD~1"]).unwrap();
+        assert_eq!(commit_tree(repo.path(), first.trim()).unwrap(), vec!["a.txt"]);
+        assert_eq!(commit_tree(repo.path(), "HEAD").unwrap(), vec!["a.txt", "docs/b.md"]);
+        assert!(commit_tree(repo.path(), "--output=x").is_err());
     }
 
     #[test]

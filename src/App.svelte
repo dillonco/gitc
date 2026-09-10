@@ -5,6 +5,7 @@
     getCommitDetail,
     getCommitFileDiff,
     getCommitGraph,
+    getCommitTree,
     getConflictFile,
     getFileBlame,
     getFileContent,
@@ -21,6 +22,9 @@
   import FileGroup from "./lib/FileGroup.svelte";
   import ReadonlyPane from "./lib/ReadonlyPane.svelte";
   import { parseDiffRows } from "./lib/diffRows";
+  import { avatarUrl, coAuthorsOf } from "./lib/avatar";
+  import { buildGraphRows, isGithubUrl, type GraphRow } from "./lib/graph";
+  import { blockedReason, undoableKinds, undoEntryFor, undoItem as toUndoItem, type UndoItem } from "./lib/undo";
   import type {
     Branch,
     CommitDetail,
@@ -30,6 +34,7 @@
     FileDiff,
     FileStatus,
     GitAction,
+    GitResult,
     RepositoryState,
     Worktree,
   } from "./lib/types";
@@ -41,28 +46,6 @@
     path?: string;
   };
 
-  type GraphLane = {
-    index: number;
-    color: string;
-    capStart: boolean;
-    capEnd: boolean;
-  };
-
-  type GraphEdge = {
-    from: number;
-    to: number;
-    color: string;
-  };
-
-  type GraphRow = {
-    commit: CommitNode;
-    lane: number;
-    lanes: GraphLane[];
-    edges: GraphEdge[];
-    color: string;
-    labels: string[];
-  };
-
   type RecentRepo = { name: string; path: string };
 
   type Settings = {
@@ -70,6 +53,8 @@
     clonePath: string;
     graphLimit: number;
     staleDays: number;
+    showAvatars: boolean;
+    pullMode: string;
   };
 
   const defaultSettings: Settings = {
@@ -77,6 +62,8 @@
     clonePath: "/Users/dillon/Documents/dev",
     graphLimit: 250,
     staleDays: 30,
+    showAvatars: true,
+    pullMode: "pull",
   };
 
   const seedRecentRepos: RecentRepo[] = [
@@ -144,6 +131,88 @@
   let noticeTimer: ReturnType<typeof setTimeout> | null = null;
   let filterInput: HTMLInputElement | null = null;
   let cloneOpen = false;
+  let pullMenuOpen = false;
+
+  const pullOptions = [
+    { kind: "pullMerge", label: "Pull (fast-forward if possible)" },
+    { kind: "pull", label: "Pull (fast-forward only)" },
+    { kind: "pullRebase", label: "Pull (rebase)" },
+  ];
+
+  // Undo and redo stacks per repository, kept for the session.
+  let undoHistory: Record<string, { undo: UndoItem[]; redo: UndoItem[] }> = {};
+  $: repoHistory = (state && undoHistory[state.root]) || { undo: [], redo: [] };
+  $: undoItem = repoHistory.undo.at(-1) ?? null;
+  $: redoItem = repoHistory.redo.at(-1) ?? null;
+
+  function recordUndo(action: GitAction, before: RepositoryState | null, result: GitResult) {
+    if (!before || !state || before.root !== state.root) return;
+    const entry = undoEntryFor(action, before, state, result);
+    if (!entry) return;
+    const current = undoHistory[state.root] ?? { undo: [], redo: [] };
+    undoHistory = {
+      ...undoHistory,
+      [state.root]: { undo: [...current.undo, toUndoItem(entry, state)].slice(-50), redo: [] },
+    };
+  }
+
+  async function replay(direction: "undo" | "redo") {
+    if (!state || busy) return;
+    const root = state.root;
+    const current = undoHistory[root] ?? { undo: [], redo: [] };
+    const item = current[direction].at(-1);
+    if (!item) return;
+    const verb = direction === "undo" ? "Undo" : "Redo";
+    busy = true;
+    error = "";
+    notice = "";
+    let failure = "";
+    try {
+      const blocked = blockedReason(item, await getRepositoryState());
+      if (blocked === "dirty") {
+        failure = `${verb} ${item.entry.label} would discard uncommitted changes. Commit or stash them first.`;
+      } else if (blocked === "moved") {
+        // Every entry beneath it is older still, so none of them can apply either.
+        undoHistory = { ...undoHistory, [root]: { ...current, [direction]: [] } };
+        failure = `Can't ${direction} ${item.entry.label}: the repository has changed since.`;
+      } else {
+        for (const step of item.entry[direction]) {
+          const result = await runGitAction(step);
+          if (!result.ok) {
+            failure = result.stderr || result.stdout || `${verb} ${item.entry.label} failed`;
+            break;
+          }
+        }
+        await refresh();
+        const next = { undo: [...current.undo], redo: [...current.redo] };
+        next[direction].pop();
+        if (!failure && state) {
+          next[direction === "undo" ? "redo" : "undo"].push(toUndoItem(item.entry, state));
+          notice = `${direction === "undo" ? "Undid" : "Redid"} ${item.entry.label}`;
+        }
+        undoHistory = { ...undoHistory, [root]: next };
+      }
+    } catch (err) {
+      failure = String(err);
+    } finally {
+      busy = false;
+    }
+    if (failure) error = failure;
+  }
+
+  function setPullMode(kind: string) {
+    settings = { ...settings, pullMode: kind };
+    try {
+      localStorage.setItem("gitc:settings", JSON.stringify(settings));
+    } catch {
+      /* localStorage unavailable */
+    }
+  }
+
+  function runPullMenu(action: GitAction, label: string) {
+    pullMenuOpen = false;
+    void execute(action, label);
+  }
 
   // Success toasts dismiss themselves; errors stay until addressed.
   $: if (notice) {
@@ -162,20 +231,6 @@
     "rebase",
     "merge",
   ]);
-  const graphColors = [
-    "#14a0bf",
-    "#036af7",
-    "#8e00c2",
-    "#f33bd2",
-    "#f94144",
-    "#ff7a45",
-    "#f5d547",
-    "#8be34b",
-    "#20d6a3",
-    "#33b5e5",
-    "#3167d9",
-    "#9c27b0",
-  ];
 
   $: staged = grouped(state, "staged");
   $: unstaged = grouped(state, "unstaged");
@@ -194,7 +249,7 @@
   $: visibleStaged = sortFiles(staged);
   $: diffRows = parseDiffRows(selectedDiff?.diff ?? "");
   $: hunkRows = diffRows.map((row, index) => ({ row, index })).filter((item) => item.row.kind === "hunk");
-  $: graphRows = buildGraphRows(commits, totalChanges > 0);
+  $: graphRows = buildGraphRows(commits, { hasWip: totalChanges > 0, remotes: state?.remotes ?? [] });
   $: visibleGraphRows = filterGraphRows(graphRows, searchOpen ? searchQuery : "");
   // No artificial floor: a linear repo has one lane, and the graph column
   // should be sized for the lanes the data actually has, not padded for
@@ -212,7 +267,11 @@
         ] as const
       ).filter((part) => part.count > 0)
     : [];
-  $: sortedCommitFiles = commitDetail ? sortByPath(commitDetail.files, sortAsc) : [];
+  $: commitFileEntries = commitDetail
+    ? withUnchangedFiles(commitDetail.files, viewAllFiles && commitTree?.hash === commitDetail.hash ? commitTree.paths : null)
+    : [];
+  $: sortedCommitFiles = sortByPath(commitFileEntries, sortAsc);
+  $: coAuthors = commitDetail ? coAuthorsOf(commitDetail.body) : [];
   $: commitFileTree = commitDetail ? buildRefTree(sortedCommitFiles, (file) => file.path, collapsedCommitDirs) : [];
   $: localTree = buildRefTree(filteredBranches, (branch) => branch.name, collapsedLocalDirs);
   $: remoteTree = buildRefTree(filteredRemoteBranches, (name) => name, collapsedRemoteDirs);
@@ -278,9 +337,10 @@
       const kept = selectedCommit
         ? graph.commits.find((commit) => commit.hash === selectedCommit?.hash) ?? null
         : null;
-      selectedCommit = kept;
-      if (kept) {
-        await loadCommitDetail(kept.hash);
+      const shown = kept ?? cleanHeadCommit(nextState, graph.commits);
+      selectedCommit = shown;
+      if (shown) {
+        await loadCommitDetail(shown.hash);
       } else {
         commitDetail = null;
       }
@@ -352,10 +412,13 @@
     }
 
     actionsOpen = false;
+    pullMenuOpen = false;
     busy = true;
     error = "";
     notice = "";
     try {
+      // Read fresh rather than trusting the last refresh: undo returns to this HEAD.
+      const before = undoableKinds.has(action.kind) ? await getRepositoryState().catch(() => null) : null;
       const result = await runGitAction(action);
       // refresh() unconditionally clears `error` at its start, so a failure
       // message would otherwise be wiped the instant it's set. Re-apply it
@@ -366,7 +429,10 @@
       } else {
         notice = `${label} complete`;
       }
-      if (result.refresh) await refresh();
+      if (result.refresh) {
+        await refresh();
+        recordUndo(action, before, result);
+      }
       if (failure) error = failure;
       if (selectedFile && action.path === selectedFile.path && diffContext === "worktree") {
         const stillThere = state?.files.some(
@@ -513,6 +579,7 @@
       commits = graph.commits;
       selectedFile = null;
       selectedDiff = null;
+      await selectCommit(cleanHeadCommit(state, graph.commits));
       centerMode = "graph";
       syncRepoTab(state.root, state.root.split("/").filter(Boolean).at(-1) ?? "repo");
       notice = `Created ${state.root}`;
@@ -534,6 +601,7 @@
       commits = graph.commits;
       selectedFile = null;
       selectedDiff = null;
+      await selectCommit(cleanHeadCommit(state, graph.commits));
       centerMode = "graph";
       syncRepoTab(state.root, state.root.split("/").filter(Boolean).at(-1) ?? "repo");
       notice = `Cloned ${state.root}`;
@@ -552,8 +620,7 @@
       commits = graph.commits;
       selectedFile = null;
       selectedDiff = null;
-      selectedCommit = null;
-      commitDetail = null;
+      await selectCommit(cleanHeadCommit(state, graph.commits));
       centerMode = "graph";
       syncRepoTab(state.root, state.root.split("/").filter(Boolean).at(-1) ?? "repo");
       if (!silent) notice = `Opened ${state.root}`;
@@ -592,14 +659,19 @@
     await loadFileAuxiliary();
   }
 
-  function laneColor(index: number) {
-    return graphColors[index % graphColors.length];
+  // An avatar that fails to load (no Gravatar, offline) stays on initials for
+  // the session rather than being re-requested every time the rows render.
+  let failedAvatars = new Set<string>();
+  $: detailAvatar = commitDetail ? avatarFor(commitDetail.email, settings.showAvatars, failedAvatars) : null;
+
+  function avatarFor(email: string, enabled: boolean, failed: Set<string>) {
+    if (!enabled) return null;
+    const url = avatarUrl(email);
+    return url && !failed.has(url) ? url : null;
   }
 
-  function refLabels(commit: CommitNode) {
-    return commit.refs
-      .map((ref) => ref.replace(/^HEAD -> /, "").replace(/^tag: /, "tag:"))
-      .filter((ref) => ref && !ref.includes("origin/HEAD"));
+  function avatarFailed(url: string) {
+    failedAvatars = new Set(failedAvatars).add(url);
   }
 
   function authorInitials(author: string) {
@@ -691,6 +763,7 @@
   }
 
   function commitStatusGlyph(status: string): { glyph: string; cls: string } {
+    if (!status) return { glyph: "", cls: "" };
     const code = status[0]?.toUpperCase();
     if (code === "A" || code === "?") return { glyph: "+", cls: "st-add" };
     if (code === "D") return { glyph: "−", cls: "st-del" };
@@ -714,69 +787,54 @@
     return parts.join(" — ");
   }
 
-  function isHeadRow(row: GraphRow) {
-    return !!state && row.commit.shortHash === state.head;
+  // With nothing to commit there is no WIP to show, so the right panel opens
+  // on the checked-out commit instead of an empty change list.
+  function cleanHeadCommit(repo: RepositoryState | null, nodes: CommitNode[]) {
+    if (!repo || repo.files.length > 0) return null;
+    return nodes.find((commit) => commit.refs.some((ref) => ref === "HEAD" || ref.startsWith("HEAD -> "))) ?? null;
   }
 
-  function isWorktreeBranch(name: string) {
-    return (state?.worktrees ?? []).some((worktree) => worktree.branch === name);
+  // "View all files": the commit's whole tree, with its changes marked.
+  let viewAllFiles = false;
+  let commitTree: { hash: string; paths: string[] } | null = null;
+  let commitTreePending = "";
+  $: if (viewAllFiles && commitDetail && commitTree?.hash !== commitDetail.hash && commitTreePending !== commitDetail.hash) {
+    void loadCommitTree(commitDetail.hash);
   }
 
-  function buildGraphRows(nodes: CommitNode[], hasWip: boolean): GraphRow[] {
-    const lanes: string[] = [];
-    const rows: GraphRow[] = [];
-
-    for (const commit of nodes) {
-      let lane = lanes.indexOf(commit.hash);
-      let laneIsNew = false;
-      if (lane === -1) {
-        lane = lanes.findIndex((value) => value === "");
-        if (lane === -1) lane = lanes.length;
-        lanes[lane] = commit.hash;
-        laneIsNew = true;
-      }
-
-      const firstParent = commit.parents[0] ?? "";
-      const visibleLanes = lanes
-        .map((hash, index) => ({ hash, index }))
-        .filter((item) => item.hash)
-        .map((item) => ({
-          index: item.index,
-          color: laneColor(item.index),
-          // The topmost lane-0 commit is left uncapped only when a WIP row sits
-          // above it to connect to. On a clean tree nothing is up there, so
-          // capping it stops a rail stub hanging off the top of the graph.
-          capStart: item.index === lane && laneIsNew && !(rows.length === 0 && lane === 0 && hasWip),
-          capEnd: item.index === lane && !firstParent,
-        }));
-      if (firstParent) {
-        lanes[lane] = firstParent;
-      } else {
-        lanes[lane] = "";
-      }
-
-      const edges: GraphEdge[] = [];
-      for (const parent of commit.parents.slice(1)) {
-        let parentLane = lanes.indexOf(parent);
-        if (parentLane === -1) {
-          parentLane = lanes.findIndex((value) => value === "");
-          if (parentLane === -1) parentLane = lanes.length;
-          lanes[parentLane] = parent;
-        }
-        edges.push({ from: lane, to: parentLane, color: laneColor(parentLane) });
-      }
-
-      rows.push({
-        commit,
-        lane,
-        lanes: visibleLanes,
-        edges,
-        color: laneColor(lane),
-        labels: refLabels(commit),
-      });
+  async function loadCommitTree(hash: string) {
+    commitTreePending = hash;
+    try {
+      const paths = await getCommitTree(hash);
+      commitTree = { hash, paths };
+    } catch (err) {
+      error = String(err);
+      viewAllFiles = false;
+    } finally {
+      commitTreePending = "";
     }
+  }
 
-    return rows;
+  function withUnchangedFiles(changes: CommitFileChange[], paths: string[] | null): CommitFileChange[] {
+    if (!paths) return changes;
+    const byPath = new Map(changes.map((change) => [change.path, change]));
+    const inTree = new Set(paths);
+    // Deleted files are gone from the tree but are still part of the change.
+    return [
+      ...paths.map((path) => byPath.get(path) ?? { status: "", path }),
+      ...changes.filter((change) => !inTree.has(change.path)),
+    ];
+  }
+
+  function splitPath(path: string) {
+    const cut = path.lastIndexOf("/") + 1;
+    return { dir: path.slice(0, cut), name: path.slice(cut) };
+  }
+
+  // Checked out in some other worktree. The current checkout's own branch is
+  // just a local branch (the HEAD pill already says it is checked out here).
+  function isWorktreeBranch(name: string) {
+    return (state?.worktrees ?? []).some((worktree) => worktree.branch === name && !worktree.current);
   }
 
   function filterGraphRows(rows: GraphRow[], query: string) {
@@ -911,14 +969,19 @@
     busy = true;
     error = "";
     notice = "";
+    let action: GitAction = { kind: "deleteBranch", branch: name };
+    let before: RepositoryState | null = null;
+    let result: GitResult | null = null;
     try {
-      let result = await runGitAction({ kind: "deleteBranch", branch: name });
+      before = await getRepositoryState().catch(() => null);
+      result = await runGitAction(action);
       if (
         !result.ok &&
         /not fully merged/i.test(result.stderr) &&
         confirm(`${result.stderr.trim()}\n\nDelete ${name} anyway? Its tip stays recoverable for about two weeks.`)
       ) {
-        result = await runGitAction({ kind: "deleteBranchForce", branch: name });
+        action = { kind: "deleteBranchForce", branch: name };
+        result = await runGitAction(action);
       }
       if (!result.ok) {
         error = result.stderr || result.stdout || "Delete branch failed";
@@ -930,7 +993,11 @@
     } finally {
       busy = false;
     }
+    // refresh() clears `error`, which used to swallow a failed delete's message.
+    const failure = error;
     await refresh();
+    if (failure) error = failure;
+    if (result) recordUndo(action, before, result);
   }
 
   // post-merge: open RebasePanel in plain mode
@@ -1034,6 +1101,19 @@
     if (event.key === "Escape") {
       settingsOpen = false;
       actionsOpen = false;
+      pullMenuOpen = false;
+    }
+    // ⌘Z / ⇧⌘Z (or ⌘Y) undo and redo git actions, but never while typing,
+    // where they belong to the text field.
+    const typing =
+      event.target instanceof HTMLElement &&
+      (event.target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(event.target.tagName));
+    const key = event.key.toLowerCase();
+    if ((event.metaKey || event.ctrlKey) && !event.altKey && !typing && (key === "z" || key === "y")) {
+      if (centerMode !== "launchpad" && !settingsOpen && !conflict) {
+        event.preventDefault();
+        void replay(key === "z" && !event.shiftKey ? "undo" : "redo");
+      }
     }
     if ((event.metaKey || event.ctrlKey) && event.altKey && event.code === "KeyF") {
       event.preventDefault();
@@ -1044,6 +1124,9 @@
   on:click={(event) => {
     if (actionsOpen && !(event.target instanceof Element && event.target.closest(".search-actions"))) {
       actionsOpen = false;
+    }
+    if (pullMenuOpen && !(event.target instanceof Element && event.target.closest(".pull-split"))) {
+      pullMenuOpen = false;
     }
   }}
 />
@@ -1057,6 +1140,9 @@
       {#each tabs as tab}
         <div class="tab-wrap">
           <button class="tab {tab.id === activeTabId ? 'active' : ''}" on:click={() => switchToTab(tab)}>
+            {#if tab.kind === "repo"}
+              <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="6" y1="3" x2="6" y2="15" /><circle cx="18" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><path d="M18 9a9 9 0 0 1-9 9" /></svg>
+            {/if}
             <span>{tab.label}</span>
           </button>
           {#if tab.kind === "repo"}
@@ -1086,34 +1172,57 @@
         </div>
       </div>
       <div class="top-actions">
-        <button title="Refresh" on:click={refresh} disabled={busy}>
-          <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6" /><path d="M1 20v-6h6" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10" /><path d="M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></svg>
-          <span>Refresh</span>
+        <button title={undoItem ? `Undo ${undoItem.entry.label} (⌘Z)` : "Nothing to undo"} on:click={() => replay("undo")} disabled={busy || !undoItem}>
+          <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /></svg>
+          <span>Undo</span>
         </button>
-        <button title="Fetch" on:click={() => execute({ kind: "fetch" }, "Fetch")} disabled={busy}>
-          <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
-          <span>Fetch</span>
+        <button title={redoItem ? `Redo ${redoItem.entry.label} (⇧⌘Z)` : "Nothing to redo"} on:click={() => replay("redo")} disabled={busy || !redoItem}>
+          <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /></svg>
+          <span>Redo</span>
         </button>
-        <button title="Pull" on:click={() => execute({ kind: "pull" }, "Pull")} disabled={busy}>
-          <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><polyline points="19 12 12 19 5 12" /></svg>
-          <span>Pull</span>
-        </button>
+        <div class="pull-split">
+          <button title={pullOptions.find((option) => option.kind === settings.pullMode)?.label ?? "Pull"} on:click={() => execute({ kind: settings.pullMode }, "Pull")} disabled={busy}>
+            <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13" /><path d="m6 10 6 6 6-6" /><path d="M5 21h14" /></svg>
+            <span>Pull</span>
+          </button>
+          <button class="pull-caret" title="Pull options" aria-haspopup="menu" class:active={pullMenuOpen} on:click={() => (pullMenuOpen = !pullMenuOpen)} disabled={busy}>
+            <svg class="caret-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 9h14l-7 8z" /></svg>
+          </button>
+          {#if pullMenuOpen}
+            <div class="dropdown-menu pull-menu" role="menu">
+              <button class="menu-plain" on:click={() => runPullMenu({ kind: "fetchAll" }, "Fetch all remotes")}>Fetch All</button>
+              {#each pullOptions as option (option.kind)}
+                <div class="menu-row">
+                  <button
+                    class="menu-default"
+                    class:checked={settings.pullMode === option.kind}
+                    title="Use for the Pull button"
+                    aria-label={`Use ${option.label} for the Pull button`}
+                    on:click={() => setPullMode(option.kind)}
+                  ></button>
+                  <button on:click={() => runPullMenu({ kind: option.kind }, option.label)}>{option.label}</button>
+                </div>
+              {/each}
+            </div>
+          {/if}
+        </div>
         <button title="Push" on:click={() => execute({ kind: "push" }, "Push")} disabled={busy}>
-          <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" /></svg>
+          <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V3" /><path d="m6 9 6-6 6 6" /><path d="M5 21h14" /></svg>
           <span>Push</span>
         </button>
-        <button title="Branch" on:click={createBranchFromToolbar}>
+        <button title="Branch" on:click={createBranchFromToolbar} disabled={busy}>
           <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15" /><circle cx="18" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><path d="M18 9a9 9 0 0 1-9 9" /></svg>
           <span>Branch</span>
         </button>
-        <button title="Compare refs (shift-click two commits in the graph)" on:click={() => openCompare(null, currentBranch)}>
-          <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /></svg>
-          <span>Compare</span>
-        </button>
-        <button title="Stash" on:click={() => execute({ kind: "stashCreate", message: "gitc stash" }, "Create stash")} disabled={busy}>
-          <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8" /><rect x="1" y="3" width="22" height="5" /><line x1="10" y1="12" x2="14" y2="12" /></svg>
+        <button title={totalChanges ? "Stash all changes" : "Nothing to stash"} on:click={() => execute({ kind: "stashCreate", message: "gitc stash" }, "Create stash")} disabled={busy || totalChanges === 0}>
+          <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v9" /><path d="m8 8 4 4 4-4" /><path d="M3 14h5l1.5 2.5h5L16 14h5v7H3z" /></svg>
           <span>Stash</span>
         </button>
+        <button title={state?.stashes.length ? `Pop ${state.stashes[0].message}` : "No stashes"} on:click={() => execute({ kind: "stashPop", target: "stash@{0}" }, "Pop stash")} disabled={busy || !state?.stashes.length}>
+          <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12V3" /><path d="m8 7 4-4 4 4" /><path d="M3 14h5l1.5 2.5h5L16 14h5v7H3z" /></svg>
+          <span>Pop</span>
+        </button>
+        <span class="toolbar-sep" aria-hidden="true"></span>
         <button title="Terminal" on:click={openRepoTerminal} disabled={busy}>
           <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5" /><line x1="12" y1="19" x2="20" y2="19" /></svg>
           <span>Terminal</span>
@@ -1130,6 +1239,8 @@
         </button>
         {#if actionsOpen}
           <div class="dropdown-menu" role="menu">
+            <button on:click={() => { actionsOpen = false; void refresh(); }} disabled={busy}>Refresh</button>
+            <button on:click={() => { actionsOpen = false; openCompare(null, currentBranch); }}>Compare Refs…</button>
             <button on:click={() => execute({ kind: "fetchAll" }, "Fetch all remotes")}>Fetch All &amp; Prune</button>
             <button on:click={() => execute({ kind: "forcePush" }, "Force push")}>Force Push (with lease)</button>
             <button on:click={() => openRebasePanel("interactive")}>Interactive Rebase…</button>
@@ -1585,31 +1696,47 @@
           <button
             class="commit-row"
             class:active={selectedCommit?.hash === row.commit.hash}
+            class:head={row.head}
+            class:date-break={rowIndex > 0 && visibleGraphRows[rowIndex - 1].dateBucket !== row.dateBucket}
+            style={`--row-color:${row.color}`}
             title={commitRowTitle(row)}
             on:click={(event) => handleCommitRowClick(event, row, rowIndex)}
           >
             <span
               class="branch-cell"
-              class:linked={row.labels.length > 0}
-              class:head={isHeadRow(row)}
+              class:linked={row.refs.length > 0}
+              class:head={row.head}
               style={`--ref-color:${row.color}`}
               title={row.labels.join("  ")}
             >
-              {#if row.labels.length}
-                <span class="ref-pill" class:head={isHeadRow(row) && row.labels[0] === currentBranch} style={`--ref-color:${row.color}`}>
-                  {#if isHeadRow(row) && row.labels[0] === currentBranch}<i class="pill-check">✓</i>{/if}
-                  <span class="pill-label">{row.labels[0]}</span>
-                  {#if isWorktreeBranch(row.labels[0])}<i class="pill-worktree">💻</i>{:else}<i class="pill-branch">⑂</i>{/if}
+              {#if row.refs.length}
+                {@const ref = row.refs[0]}
+                <span class="ref-pill" class:head={ref.head} style={`--ref-color:${row.color}`}>
+                  {#if ref.head}<i class="pill-check">✓</i>{/if}
+                  <span class="pill-label">{ref.name}</span>
+                  {#if ref.tag}
+                    <svg class="pill-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="tag"><path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4z" /><circle cx="7.5" cy="7.5" r="1" fill="currentColor" /></svg>
+                  {:else if ref.local && isWorktreeBranch(ref.name)}
+                    <svg class="pill-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="checked out in another worktree"><path d="m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z" /><path d="M12 22v-3" /></svg>
+                  {:else if ref.local}
+                    <svg class="pill-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="local"><rect x="4" y="5" width="16" height="11" rx="1.5" /><path d="M2 19.5h20" /></svg>
+                  {/if}
+                  {#if ref.remotes.some((remote) => isGithubUrl(state?.remoteUrls?.[remote]))}
+                    <svg class="pill-icon" viewBox="0 0 16 16" fill="currentColor" aria-label="GitHub"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z" /></svg>
+                  {/if}
+                  {#if ref.remotes.some((remote) => !isGithubUrl(state?.remoteUrls?.[remote]))}
+                    <svg class="pill-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label={ref.remotes.join(", ")}><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" /></svg>
+                  {/if}
                 </span>
-                {#if row.labels.length > 1}
-                  <span class="ref-pill more-pill" style={`--ref-color:${row.color}`}>+{row.labels.length - 1}</span>
+                {#if row.refs.length > 1}
+                  <span class="ref-pill more-pill" style={`--ref-color:${row.color}`}>+{row.refs.length - 1}</span>
                 {/if}
               {/if}
             </span>
             <span class="graph-cell" style={`--lane-count:${graphLaneCount}`}>
               <span class="graph-tint" style={`--lane:${row.lane}; --lane-color:${row.color}`}></span>
-              {#if row.labels.length}
-                <span class="ref-link" class:head={isHeadRow(row)} style={`--lane:${row.lane}; --lane-color:${row.color}`}></span>
+              {#if row.refs.length}
+                <span class="ref-link" class:head={row.head} style={`--lane:${row.lane}; --lane-color:${row.color}`}></span>
               {/if}
               {#each row.lanes as lane}
                 <span
@@ -1627,9 +1754,18 @@
                   style={`--from:${Math.min(edge.from, edge.to)}; --span:${Math.abs(edge.to - edge.from) || 1}; --lane-color:${edge.color}`}
                 ></span>
               {/each}
-              <span class="commit-dot" style={`--lane:${row.lane}; --lane-color:${row.color}`}>
-                {#if row.commit.parents.length > 1}<i class="merge-glyph">≡</i>{:else}{authorInitials(row.commit.author)}{/if}
-              </span>
+              {#each row.joins as join}
+                <span class="graph-join" style={`--from:${join.to}; --span:${join.from - join.to}; --lane-color:${join.color}`}></span>
+              {/each}
+              {#if row.commit.parents.length > 1}
+                <span class="commit-dot merge" style={`--lane:${row.lane}; --lane-color:${row.color}`}></span>
+              {:else}
+                {@const avatar = avatarFor(row.commit.email, settings.showAvatars, failedAvatars)}
+                <span class="commit-dot" style={`--lane:${row.lane}; --lane-color:${row.color}`}>
+                  {authorInitials(row.commit.author)}
+                  {#if avatar}<img src={avatar} alt="" loading="lazy" on:error={() => avatarFailed(avatar)} />{/if}
+                </span>
+              {/if}
             </span>
             <span class="commit-main">
               <strong>
@@ -1639,10 +1775,10 @@
                     <em>{row.commit.bodySummary}</em>
                   </span>
                 {/if}
-                {#if rowIndex > 0 && visibleGraphRows[rowIndex - 1].commit.relativeDate !== row.commit.relativeDate}
-                  <span class="date-marker">{row.commit.relativeDate}</span>
-                {/if}
               </strong>
+              {#if rowIndex > 0 && visibleGraphRows[rowIndex - 1].dateBucket !== row.dateBucket}
+                <span class="date-marker">{row.dateBucket}</span>
+              {/if}
             </span>
           </button>
         {:else}
@@ -1658,9 +1794,8 @@
         <div class="commit-detail">
           <div class="commit-detail-head">
             <button class="commit-hash-btn" title="Copy hash" on:click={() => selectedCommit && copyHash(selectedCommit.hash)}>
-              commit: <strong>{selectedCommit.shortHash}</strong>
+              commit: <strong>{selectedCommit.hash.slice(0, 6)}</strong>
             </button>
-            <button class="commit-detail-close" title="Back to work in progress" on:click={() => selectCommit(null)}>×</button>
           </div>
           {#if commitDetailBusy}
             <p class="empty centered">Loading commit…</p>
@@ -1677,7 +1812,10 @@
               <div class="split-handle"></div>
 
               <div class="commit-author-row">
-                <span class="author-badge">{authorInitials(commitDetail.author)}</span>
+                <span class="author-badge">
+                  {authorInitials(commitDetail.author)}
+                  {#if detailAvatar}<img src={detailAvatar} alt="" on:error={() => detailAvatar && avatarFailed(detailAvatar)} />{/if}
+                </span>
                 <div class="commit-author-main">
                   <strong>{commitDetail.author}</strong>
                   <small>authored {commitDetail.date}</small>
@@ -1685,15 +1823,21 @@
                 {#if commitDetail.parents.length}
                   <div class="commit-parent">
                     <span>{commitDetail.parents.length === 1 ? "parent" : "parents"}:</span>
-                    <strong>{commitDetail.parents.map((parent) => parent.slice(0, 7)).join(", ")}</strong>
+                    <strong>{commitDetail.parents.map((parent) => parent.slice(0, 6)).join(", ")}</strong>
                   </div>
                 {/if}
               </div>
 
-              {#if commitDetail.refs.length}
-                <div class="detail-refs">
-                  <span class="detail-refs-label">refs</span>
-                  {commitDetail.refs.map((ref) => ref.replace(/^HEAD -> /, "")).join(", ")}
+              {#if coAuthors.length}
+                <div class="commit-coauthors">
+                  <span>Co-authors:</span>
+                  {#each coAuthors as person (person.email)}
+                    {@const url = avatarFor(person.email, settings.showAvatars, failedAvatars)}
+                    <span class="author-badge coauthor-badge" title={`${person.name} <${person.email}>`}>
+                      {authorInitials(person.name)}
+                      {#if url}<img src={url} alt="" on:error={() => avatarFailed(url)} />{/if}
+                    </span>
+                  {/each}
                 </div>
               {/if}
 
@@ -1707,6 +1851,10 @@
                   <button class:active={rightTab === "path"} on:click={() => (rightTab = "path")}>☰ Path</button>
                   <button class:active={rightTab === "tree"} on:click={() => (rightTab = "tree")}>⌘ Tree</button>
                 </div>
+                <label class="view-all-files">
+                  <input type="checkbox" bind:checked={viewAllFiles} />
+                  View all files
+                </label>
               </div>
 
               <div class="commit-files">
@@ -1721,8 +1869,10 @@
                       <button
                         class="commit-file-row tree-row"
                         class:active={commitFilePath === row.item.path && diffContext === "commit"}
+                        class:unchanged={!row.item.status}
                         style={`--depth:${row.depth}`}
-                        title={`${statusLabel(row.item.status)}: ${row.item.path}`}
+                        title={row.item.status ? `${statusLabel(row.item.status)}: ${row.item.path}` : row.item.path}
+                        disabled={!row.item.status}
                         on:click={() => openCommitFile(row.item)}
                       >
                         <span class={commitStatusGlyph(row.item.status).cls}>{commitStatusGlyph(row.item.status).glyph}</span>
@@ -1734,14 +1884,17 @@
                   {/each}
                 {:else}
                   {#each sortedCommitFiles as change (change.path)}
+                    {@const parts = splitPath(change.path)}
                     <button
                       class="commit-file-row"
                       class:active={commitFilePath === change.path && diffContext === "commit"}
-                      title={`${statusLabel(change.status)}: ${change.path}`}
+                      class:unchanged={!change.status}
+                      title={change.status ? `${statusLabel(change.status)}: ${change.path}` : change.path}
+                      disabled={!change.status}
                       on:click={() => openCommitFile(change)}
                     >
                       <span class={commitStatusGlyph(change.status).cls}>{commitStatusGlyph(change.status).glyph}</span>
-                      <strong>{change.path}</strong>
+                      <strong>{#if parts.dir}<em class="path-dir">{parts.dir}</em>{/if}{parts.name}</strong>
                     </button>
                   {:else}
                     <p class="empty">No file changes recorded</p>
@@ -1964,6 +2117,10 @@
             <label for="settings-stale-days">Branch cleanup: stale after (1–3650 days)</label>
             <input id="settings-stale-days" type="number" min="1" max="3650" bind:value={settings.staleDays} />
           </div>
+          <label class="checkbox">
+            <input type="checkbox" bind:checked={settings.showAvatars} />
+            Show author avatars (loaded from GitHub and Gravatar)
+          </label>
         </div>
         <div class="modal-footer">
           <button on:click={() => (settingsOpen = false)}>Cancel</button>

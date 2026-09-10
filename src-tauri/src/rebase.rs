@@ -88,12 +88,13 @@ pub(crate) fn rebase_plan(root: &Path, base: Option<&str>) -> Result<RebasePlan,
     // Cap well above the interactive-rebase step limit so a mis-chosen base
     // (e.g. an unrelated branch) fails validation cheaply instead of
     // serialising thousands of commits just to display an empty-ish plan.
+    let format_arg = format!("--format={COMMIT_LOG_FORMAT}");
     let out = git(
         root,
         &[
             "log",
             "--reverse",
-            "--format=%H%x1f%P%x1f%D%x1f%an%x1f%ar%x1f%s%x1f%b%x1e",
+            &format_arg,
             "-n",
             "501",
             &range,
