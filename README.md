@@ -59,3 +59,8 @@ npm run build
 ```text
 src-tauri/target/release/bundle/macos/gitc.app
 ```
+
+## License
+
+Proprietary — copyright (c) 2026 Dillon, all rights reserved. The source is
+published for reference only; see [LICENSE](LICENSE).
