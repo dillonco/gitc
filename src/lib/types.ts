@@ -45,6 +45,8 @@ export interface RepositoryState {
   files: FileStatus[];
   branches: Branch[];
   remotes: string[];
+  // Fetch URL per remote name.
+  remoteUrls: Record<string, string>;
   remoteBranches: string[];
   tags: string[];
   worktrees: Worktree[];
@@ -58,6 +60,9 @@ export interface CommitNode {
   parents: string[];
   refs: string[];
   author: string;
+  email: string;
+  // Committer date, unix seconds: what --date-order sorts by.
+  timestamp: number;
   relativeDate: string;
   subject: string;
   bodySummary: string;

@@ -3,10 +3,6 @@
 // commit cap this module implements.
 use super::*;
 
-/// Same shape as `commit_graph`'s format string (lib.rs) so `parse_commit_graph`
-/// can be reused as-is.
-const COMMIT_LOG_FORMAT: &str = "%H%x1f%P%x1f%D%x1f%an%x1f%ar%x1f%s%x1f%b%x1e";
-
 /// REVIEW-PERF must-fix 5: an unbounded `git log base..head` is ~430 B/commit
 /// of IPC JSON. Cap it like `commit_graph` does and surface the truncation.
 const COMMIT_LOG_CAP: usize = 1000;
