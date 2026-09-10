@@ -72,10 +72,10 @@ describe("demo backend: gh_status / gh_repo_list", () => {
   it("filters the list by owner", async () => {
     const demoInvoke = await loadDemo();
     const all = await ghRepoList(demoInvoke);
-    const subset = await ghRepoList(demoInvoke, "osfmanagement");
+    const subset = await ghRepoList(demoInvoke, "octo-org");
     expect(subset.length).toBeGreaterThan(0);
     expect(subset.length).toBeLessThan(all.length);
-    expect(subset.every((repo) => repo.owner === "osfmanagement")).toBe(true);
+    expect(subset.every((repo) => repo.owner === "octo-org")).toBe(true);
   });
 
   it("respects the limit argument", async () => {
