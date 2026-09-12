@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildGraphRows, groupRefs, isGithubUrl, relativeBucket } from "./graph";
+import { buildGraphRows, githubOwner, githubOwnerAvatar, groupRefs, isGithubUrl, relativeBucket } from "./graph";
 import type { CommitNode } from "./types";
 
 describe("isGithubUrl", () => {
@@ -16,6 +16,29 @@ describe("isGithubUrl", () => {
     expect(isGithubUrl("https://notgithub.com/repo.git")).toBe(false);
     expect(isGithubUrl("/srv/repos/local.git")).toBe(false);
     expect(isGithubUrl(undefined)).toBe(false);
+  });
+});
+
+describe("githubOwner", () => {
+  it("reads the account out of every URL form git accepts", () => {
+    expect(githubOwner("git@github.com:octo-org/example.git")).toBe("octo-org");
+    expect(githubOwner("https://github.com/octo-org/example.git")).toBe("octo-org");
+    expect(githubOwner("https://x-access-token:abc@github.com/octo-org/example")).toBe("octo-org");
+    expect(githubOwner("ssh://git@ssh.github.com:443/octo-org/example.git")).toBe("octo-org");
+    expect(githubOwner("ssh://git@github.com/octo-org/example")).toBe("octo-org");
+  });
+
+  it("returns null for other hosts and URLs with no owner", () => {
+    expect(githubOwner("git@gitlab.com:group/repo.git")).toBeNull();
+    expect(githubOwner("https://github.com/")).toBeNull();
+    expect(githubOwner(undefined)).toBeNull();
+  });
+
+  it("builds the account's avatar URL", () => {
+    expect(githubOwnerAvatar("git@github.com:octo-org/example.git")).toBe(
+      "https://avatars.githubusercontent.com/octo-org?s=32",
+    );
+    expect(githubOwnerAvatar("git@gitlab.com:group/repo.git")).toBeNull();
   });
 });
 

@@ -24,7 +24,7 @@
   import { parseDiffRows } from "./lib/diffRows";
   import { avatarUrl, coAuthorsOf } from "./lib/avatar";
   import { hoverExpand } from "./lib/hoverExpand";
-  import { buildGraphRows, isGithubUrl, type GraphRow } from "./lib/graph";
+  import { buildGraphRows, githubOwnerAvatar, isGithubUrl, type GraphRow } from "./lib/graph";
   import { blockedReason, undoableKinds, undoEntryFor, undoItem as toUndoItem, type UndoItem } from "./lib/undo";
   import type {
     Branch,
@@ -252,9 +252,8 @@
   $: hunkRows = diffRows.map((row, index) => ({ row, index })).filter((item) => item.row.kind === "hunk");
   $: graphRows = buildGraphRows(commits, { hasWip: totalChanges > 0, remotes: state?.remotes ?? [] });
   $: visibleGraphRows = filterGraphRows(graphRows, searchOpen ? searchQuery : "");
-  // No artificial floor: a linear repo has one lane, and the graph column
-  // should be sized for the lanes the data actually has, not padded for
-  // lanes that don't exist (was Math.max(3, ...), wasting column width).
+  // The column grows past its 130px floor (styles.css, --graph-column) only
+  // when the history actually has the lanes for it.
   $: graphLaneCount = Math.max(1, ...graphRows.flatMap((row) => row.lanes.map((lane) => lane.index + 1)));
   $: filteredBranches = (state?.branches ?? []).filter(
     (branch) => !searchQuery.trim() || branch.name.toLowerCase().includes(searchQuery.trim().toLowerCase()),
@@ -669,6 +668,14 @@
     if (!enabled) return null;
     const url = avatarUrl(email);
     return url && !failed.has(url) ? url : null;
+  }
+
+  // The pill for a branch on a GitHub remote carries the remote account's
+  // avatar; it falls back to the GitHub mark when that can't be loaded.
+  function remoteAvatarFor(url: string | null | undefined, enabled: boolean, failed: Set<string>) {
+    if (!enabled) return null;
+    const avatar = githubOwnerAvatar(url);
+    return avatar && !failed.has(avatar) ? avatar : null;
   }
 
   function avatarFailed(url: string) {
@@ -1712,6 +1719,7 @@
             >
               {#if row.refs.length}
                 {@const ref = row.refs[0]}
+                {@const githubRemote = ref.remotes.find((remote) => isGithubUrl(state?.remoteUrls?.[remote]))}
                 <span class="ref-pill" class:head={ref.head} style={`--ref-color:${row.color}`}>
                   {#if ref.head}<i class="pill-check">✓</i>{/if}
                   <span class="pill-label" use:hoverExpand={{ text: ref.name }}>{ref.name}</span>
@@ -1722,8 +1730,13 @@
                   {:else if ref.local}
                     <svg class="pill-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="local"><rect x="4" y="5" width="16" height="11" rx="1.5" /><path d="M2 19.5h20" /></svg>
                   {/if}
-                  {#if ref.remotes.some((remote) => isGithubUrl(state?.remoteUrls?.[remote]))}
-                    <svg class="pill-icon" viewBox="0 0 16 16" fill="currentColor" aria-label="GitHub"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z" /></svg>
+                  {#if githubRemote}
+                    {@const ownerAvatar = remoteAvatarFor(state?.remoteUrls?.[githubRemote], settings.showAvatars, failedAvatars)}
+                    {#if ownerAvatar}
+                      <img class="pill-avatar" src={ownerAvatar} alt="GitHub" loading="lazy" on:error={() => avatarFailed(ownerAvatar)} />
+                    {:else}
+                      <svg class="pill-icon" viewBox="0 0 16 16" fill="currentColor" aria-label="GitHub"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z" /></svg>
+                    {/if}
                   {/if}
                   {#if ref.remotes.some((remote) => !isGithubUrl(state?.remoteUrls?.[remote]))}
                     <svg class="pill-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label={ref.remotes.join(", ")}><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" /></svg>
