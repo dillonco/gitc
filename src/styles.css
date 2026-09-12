@@ -1084,9 +1084,11 @@ small {
 .graph-area {
   /* Lane geometry lives here so pitch, dot size and column width stay in step. */
   --lane-pitch: 22px;
-  /* 24px: half a 22px dot (11px) plus a 13px margin. 35px left a wide
-     empty run between the dot and the message on linear history. */
-  --lane-center: 24px;
+  /* The first lane sits 38px in and the column is floored at 130px, as in
+     the reference: the run from the pill to the dot, and the tinted band
+     from the dot to the message, both read as part of the graph. */
+  --lane-center: 38px;
+  --graph-column: minmax(130px, calc(var(--lane-center) + var(--lane-count, 1) * var(--lane-pitch) + 25px));
   position: relative;
   grid-column: 2;
   grid-row: 3;
@@ -1298,7 +1300,7 @@ small {
 
 .graph-head {
   display: grid;
-  grid-template-columns: 140px minmax(52px, calc(19px + var(--lane-count, 1) * var(--lane-pitch, 22px))) minmax(240px, 1fr);
+  grid-template-columns: 140px var(--graph-column) minmax(240px, 1fr);
   height: 22px;
   background: var(--panel);
   color: var(--ink-dim);
@@ -1343,7 +1345,7 @@ small {
 .wip-row,
 .commit-row {
   display: grid;
-  grid-template-columns: 140px minmax(52px, calc(19px + var(--lane-count, 1) * var(--lane-pitch, 22px))) minmax(240px, 1fr);
+  grid-template-columns: 140px var(--graph-column) minmax(240px, 1fr);
   align-items: center;
   width: 100%;
   height: 28px;
@@ -1564,7 +1566,7 @@ small {
   padding: 0 6px;
   color: #c6cfd1;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 400;
   letter-spacing: 0;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1602,6 +1604,15 @@ small {
 
 .ref-pill.head .pill-icon {
   color: #fff;
+}
+
+/* The GitHub account's avatar, standing in for the GitHub mark. */
+.ref-pill .pill-avatar {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  object-fit: cover;
 }
 
 .graph-cell {

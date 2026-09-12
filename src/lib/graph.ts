@@ -184,8 +184,23 @@ export function groupRefs(refs: string[], remotes: string[]): RefGroup[] {
 }
 
 // https, ssh (scp-style or ssh://, including ssh.github.com:443) and token URLs.
+const githubUrl = /^(?:(?:https?|ssh|git):\/\/)?(?:[^@/]+@)?(?:www\.|ssh\.)?github\.com(?::\d+)?[:/]+([^/]+)\//i;
+
 export function isGithubUrl(url: string | null | undefined) {
   return !!url && /^(?:(?:https?|ssh|git):\/\/)?(?:[^@/]+@)?(?:www\.|ssh\.)?github\.com[:/]/i.test(url.trim());
+}
+
+// The account (user or org) a GitHub remote belongs to, so a pill can carry
+// its avatar in place of a generic GitHub mark. Null for anything that is
+// not a GitHub URL with an owner segment.
+export function githubOwner(url: string | null | undefined): string | null {
+  const match = url?.trim().match(githubUrl);
+  return match && match[1] ? match[1] : null;
+}
+
+export function githubOwnerAvatar(url: string | null | undefined, size = 32): string | null {
+  const owner = githubOwner(url);
+  return owner ? `https://avatars.githubusercontent.com/${encodeURIComponent(owner)}?s=${size}` : null;
 }
 
 // Coarse, floored buckets for the date dividers. git's own relative dates

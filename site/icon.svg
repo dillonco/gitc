@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- gitc app icon: the commit graph, drawn the way the app draws it.
+       Sized for macOS: an 824px tile on a 1024px canvas, 22.4% corner radius. -->
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2d313b" />
+      <stop offset="1" stop-color="#1c1e24" />
+    </linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.07" />
+      <stop offset="0.6" stop-color="#ffffff" stop-opacity="0" />
+    </linearGradient>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#tile)" />
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#sheen)" />
+  <rect x="112" y="112" width="800" height="800" rx="173" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="4" />
+
+  <!-- Lane 1: forks from the bottom commit, merges into the top one. -->
+  <path d="M392 734 C392 640 632 700 632 512 C632 324 392 384 392 290" fill="none" stroke="#0669f7" stroke-width="40" stroke-linecap="round" />
+  <!-- Lane 0 -->
+  <line x1="392" y1="290" x2="392" y2="734" stroke="#15a0bf" stroke-width="40" stroke-linecap="round" />
+
+  <!-- Nodes: dark centre, lane-coloured ring, like the graph's commit dots. -->
+  <g fill="#1c1e24" stroke-width="36">
+    <circle cx="632" cy="512" r="66" stroke="#0669f7" />
+    <circle cx="392" cy="290" r="66" stroke="#15a0bf" />
+    <circle cx="392" cy="512" r="66" stroke="#15a0bf" />
+    <circle cx="392" cy="734" r="66" stroke="#15a0bf" />
+  </g>
+</svg>
