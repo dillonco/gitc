@@ -3283,3 +3283,35 @@ summary::-webkit-details-marker {
     min-width: 48px;
   }
 }
+
+/* Hover-to-expand float (src/lib/hoverExpand.ts). Fixed and body-level so
+   the overflow:hidden columns it escapes from can't clip it. Font and colour
+   are copied from the clipped element at runtime; the offsets in the action
+   assume this 1px border + padding so the text lands on the same origin. */
+.hover-expand {
+  position: fixed;
+  z-index: 50;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  box-sizing: border-box;
+  overflow: hidden;
+  border: 1px solid var(--edge-hi);
+  border-radius: 3px;
+  background: var(--chrome);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  padding: 2px 6px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+
+/* The leaf label inside .branch-name-line must be the element that
+   ellipsises (and that hoverExpand measures); as a bare flex item it refused
+   to shrink and the parent clipped it without an ellipsis. */
+.branch-name-line > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

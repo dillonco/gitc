@@ -23,6 +23,7 @@
   import ReadonlyPane from "./lib/ReadonlyPane.svelte";
   import { parseDiffRows } from "./lib/diffRows";
   import { avatarUrl, coAuthorsOf } from "./lib/avatar";
+  import { hoverExpand } from "./lib/hoverExpand";
   import { buildGraphRows, isGithubUrl, type GraphRow } from "./lib/graph";
   import { blockedReason, undoableKinds, undoEntryFor, undoItem as toUndoItem, type UndoItem } from "./lib/undo";
   import type {
@@ -1314,7 +1315,7 @@
                       <span class="branch-name-line">
                         {#if row.item.current}<i class="branch-check">✓</i>{/if}
                         <svg class="tree-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15" /><circle cx="18" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><path d="M18 9a9 9 0 0 1-9 9" /></svg>
-                        <span>{row.label}</span>
+                        <span use:hoverExpand={{ text: row.label }}>{row.label}</span>
                       </span>
                     </button>
                     {#if !row.item.current}
@@ -1364,7 +1365,7 @@
                     on:click={() => execute({ kind: "checkoutRemote", target: row.item }, `Checkout ${row.item}`)}
                     disabled={busy}
                   >
-                    <span class="branch-name-line"><svg class="tree-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15" /><circle cx="18" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><path d="M18 9a9 9 0 0 1-9 9" /></svg> <span>{row.label}</span></span>
+                    <span class="branch-name-line"><svg class="tree-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15" /><circle cx="18" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><path d="M18 9a9 9 0 0 1-9 9" /></svg> <span use:hoverExpand={{ text: row.label }}>{row.label}</span></span>
                   </button>
                 {/if}
               {:else}
@@ -1408,7 +1409,7 @@
                     <span class="wt-dot"></span>
                     <span class="wt-label">
                       <span class="wt-name">
-                        <span class="wt-branch">{worktreeLabel(worktree)}</span>
+                        <span class="wt-branch" use:hoverExpand={{ text: worktreeLabel(worktree) }}>{worktreeLabel(worktree)}</span>
                         {#if worktree.main}<em>main</em>{/if}
                         {#if worktree.locked}<em title={worktree.lockReason ?? "locked"}>locked</em>{/if}
                         {#if worktree.prunable}<em>stale</em>{/if}
@@ -1446,7 +1447,7 @@
                 <div class="stash-row">
                   <div class="stash-info" title={stash.message}>
                     <span>{stash.name}</span>
-                    <small>{stash.message}</small>
+                    <small use:hoverExpand={{ text: stash.message }}>{stash.message}</small>
                   </div>
                   <div class="stash-actions">
                     <button title="Apply stash" on:click={() => execute({ kind: "stashApply", target: stash.name }, `Apply ${stash.name}`)} disabled={busy}>Apply</button>
@@ -1479,7 +1480,7 @@
                     on:click={() => execute({ kind: "checkoutCommit", target: tag }, `Checkout ${tag}`)}
                     disabled={busy}
                   >
-                    <span>⌖ {tag}</span>
+                    <span use:hoverExpand={{ text: `⌖ ${tag}` }}>⌖ {tag}</span>
                   </button>
                   <button
                     class="row-action danger"
@@ -1713,7 +1714,7 @@
                 {@const ref = row.refs[0]}
                 <span class="ref-pill" class:head={ref.head} style={`--ref-color:${row.color}`}>
                   {#if ref.head}<i class="pill-check">✓</i>{/if}
-                  <span class="pill-label">{ref.name}</span>
+                  <span class="pill-label" use:hoverExpand={{ text: ref.name }}>{ref.name}</span>
                   {#if ref.tag}
                     <svg class="pill-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="tag"><path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4z" /><circle cx="7.5" cy="7.5" r="1" fill="currentColor" /></svg>
                   {:else if ref.local && isWorktreeBranch(ref.name)}
@@ -1769,10 +1770,10 @@
             </span>
             <span class="commit-main">
               <strong>
-                <span>{row.commit.subject}</span>
+                <span use:hoverExpand={{ text: row.commit.subject }}>{row.commit.subject}</span>
                 {#if row.commit.bodySummary}
                   <span class="commit-summary">
-                    <em>{row.commit.bodySummary}</em>
+                    <em use:hoverExpand={{ text: row.commit.bodySummary }}>{row.commit.bodySummary}</em>
                   </span>
                 {/if}
               </strong>
