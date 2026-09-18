@@ -1142,9 +1142,11 @@
 <main class="shell" class:launchpad-mode={centerMode === "launchpad"}>
   <!-- Dragging the empty chrome moves the window: with an overlay title
        bar there is no system title bar left to grab. Tauri checks the
-       event target, so the tabs and buttons inside still take clicks. -->
+       event target itself, not its ancestors, so every container that
+       covers empty header space carries the attribute; the tabs and
+       buttons inside still take clicks. -->
   <header class="app-header" data-tauri-drag-region>
-    <nav class="tabs" aria-label="Open repositories">
+    <nav class="tabs" aria-label="Open repositories" data-tauri-drag-region>
       {#each tabs as tab}
         <div class="tab-wrap">
           <button class="tab {tab.id === activeTabId ? 'active' : ''}" on:click={() => switchToTab(tab)}>
@@ -1160,10 +1162,10 @@
       {/each}
       <button class="tab add-tab" title="Open repository" on:click={showAddRepoNotice}>+</button>
     </nav>
-    <div class="account-strip">
+    <div class="account-strip" data-tauri-drag-region>
       <button title="Notifications" on:click={() => (notice = "No notifications")}>◔</button>
       <button title="Settings" on:click={() => (settingsOpen = true)}>⚙</button>
-      <strong>{accountName}</strong>
+      <strong data-tauri-drag-region>{accountName}</strong>
     </div>
   </header>
 
