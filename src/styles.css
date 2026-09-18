@@ -538,6 +538,60 @@ p {
   padding-left: 34px;
 }
 
+/* The branch label opens a menu of local branches. The wrapper is the grid
+   cell and the menu's positioning parent; the button inside keeps the same
+   stacked caption/name look as the repository button beside it. */
+.branch-picker {
+  position: relative;
+  display: grid;
+  min-width: 0;
+}
+
+.branch-select {
+  width: 100%;
+  cursor: pointer;
+}
+
+.branch-select.active {
+  background: rgb(255 255 255 / 0.06);
+}
+
+.branch-menu {
+  left: 0;
+  right: auto;
+  min-width: 240px;
+  max-width: 420px;
+  max-height: min(60vh, 420px);
+  overflow-y: auto;
+}
+
+.branch-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  border-radius: var(--radius);
+  padding: 0 10px;
+  font-size: 13px;
+  text-align: left;
+}
+
+.branch-menu button span {
+  overflow: hidden;
+  color: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Reserve the checkmark's slot on every row so names line up. */
+.branch-menu .branch-check:empty {
+  background: transparent;
+}
+
+.branch-menu .empty {
+  padding: 6px 10px;
+}
+
 /* The radio beside each mode picks what the Pull button itself runs. */
 .top-actions .pull-menu .menu-default {
   position: relative;

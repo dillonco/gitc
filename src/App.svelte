@@ -133,6 +133,7 @@
   let filterInput: HTMLInputElement | null = null;
   let cloneOpen = false;
   let pullMenuOpen = false;
+  let branchMenuOpen = false;
 
   const pullOptions = [
     { kind: "pullMerge", label: "Pull (fast-forward if possible)" },
@@ -413,6 +414,7 @@
 
     actionsOpen = false;
     pullMenuOpen = false;
+    branchMenuOpen = false;
     busy = true;
     error = "";
     notice = "";
@@ -1110,6 +1112,7 @@
       settingsOpen = false;
       actionsOpen = false;
       pullMenuOpen = false;
+      branchMenuOpen = false;
     }
     // ⌘Z / ⇧⌘Z (or ⌘Y) undo and redo git actions, but never while typing,
     // where they belong to the text field.
@@ -1135,6 +1138,9 @@
     }
     if (pullMenuOpen && !(event.target instanceof Element && event.target.closest(".pull-split"))) {
       pullMenuOpen = false;
+    }
+    if (branchMenuOpen && !(event.target instanceof Element && event.target.closest(".branch-picker"))) {
+      branchMenuOpen = false;
     }
   }}
 />
@@ -1176,9 +1182,41 @@
           <span>repository</span>
           <strong>{repoName}</strong>
         </button>
-        <div class="branch-select">
-          <span>branch</span>
-          <strong>{currentBranch}</strong>
+        <div class="branch-picker">
+          <button
+            class="branch-select"
+            title="Switch branch"
+            aria-haspopup="menu"
+            aria-expanded={branchMenuOpen}
+            class:active={branchMenuOpen}
+            on:click={() => {
+              actionsOpen = false;
+              pullMenuOpen = false;
+              branchMenuOpen = !branchMenuOpen;
+            }}
+            disabled={busy}
+          >
+            <span>branch</span>
+            <strong>{currentBranch}</strong>
+          </button>
+          {#if branchMenuOpen}
+            <div class="dropdown-menu branch-menu" role="menu">
+              {#each state?.branches ?? [] as branch (branch.name)}
+                <button
+                  role="menuitemradio"
+                  aria-checked={branch.current}
+                  class:current={branch.current}
+                  title={branchTooltip(branch)}
+                  on:click={() => (branch.current ? (branchMenuOpen = false) : execute({ kind: "checkoutBranch", branch: branch.name }, `Checkout ${branch.name}`))}
+                >
+                  <i class="branch-check" aria-hidden="true">{branch.current ? "✓" : ""}</i>
+                  <span>{branch.name}</span>
+                </button>
+              {:else}
+                <p class="empty">No local branches</p>
+              {/each}
+            </div>
+          {/if}
         </div>
       </div>
       <div class="top-actions">
