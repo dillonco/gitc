@@ -1840,8 +1840,11 @@ small {
    a couple of characters plus an ellipsis, which read as noise ("C…").
    A container query gives it a hard cutoff instead: the wrapper still
    shrinks continuously (it's the flex item), but the <em> inside it only
-   renders once the wrapper actually has room to say something. */
-.commit-summary {
+   renders once the wrapper actually has room to say something. The wrapper
+   is itself a span inside strong, so the selector has to outrank
+   `.commit-main strong span` above or it inherits that rule's flex:0 1 auto
+   and collapses to nothing under inline-size containment. */
+.commit-main strong .commit-summary {
   container-type: inline-size;
   flex: 1 1 0;
   min-width: 0;
