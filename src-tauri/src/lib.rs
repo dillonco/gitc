@@ -383,6 +383,9 @@ fn run_action(root: &Path, action: &GitAction) -> Result<GitResult, String> {
         }
     }
     let args = action_args(action)?;
+    if matches!(action.kind.as_str(), "pull" | "pullMerge" | "pullRebase") {
+        return pull(root, &args);
+    }
     // No terminal is attached, so `merge --continue` / `rebase --continue`
     // would otherwise try to launch an editor: for `merge --continue` to
     // confirm the merge commit message, and for `rebase --continue` on any
@@ -394,6 +397,34 @@ fn run_action(root: &Path, action: &GitAction) -> Result<GitResult, String> {
         return Ok(run_git_env(root, &args, &[("GIT_EDITOR", "true")]));
     }
     Ok(run_git(root, &args))
+}
+
+/// `git pull <remote>` with no branch only works when the current branch
+/// tracks a branch on that remote. With an upstream, pull it without naming a
+/// remote so git follows the tracking config; without one, name the remote
+/// branch of the same name explicitly. `args` is `["pull", <flag>, <remote>]`.
+fn pull(root: &Path, args: &[&str]) -> Result<GitResult, String> {
+    let (flag, remote) = (args[1], args[2]);
+    if git_optional(root, &["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"])?.is_some() {
+        return Ok(run_git(root, &["pull", flag]));
+    }
+    let Some(branch) = git_optional(root, &["symbolic-ref", "--quiet", "--short", "HEAD"])? else {
+        return Ok(command_error("cannot pull with a detached HEAD; check out a branch first"));
+    };
+    let remote_ref = format!("refs/remotes/{remote}/{branch}");
+    if git_optional(root, &["rev-parse", "--verify", "--quiet", &remote_ref])?.is_none() {
+        return Ok(command_error(format!(
+            "'{branch}' has no upstream and {remote}/{branch} does not exist; push the branch first, or fetch if it was just created"
+        )));
+    }
+    let result = run_git(root, &["pull", flag, remote, &branch]);
+    if result.ok {
+        // Track it from now on, as push -u would, so later pulls and the
+        // ahead/behind counts follow it. The pull itself already succeeded.
+        let upstream = format!("{remote}/{branch}");
+        run_git(root, &["branch", &format!("--set-upstream-to={upstream}")]);
+    }
+    Ok(result)
 }
 
 fn canonical_or_self(path: &Path) -> PathBuf {
@@ -2311,6 +2342,49 @@ mod git_integration_tests {
         let pull = act("pull");
         let result = run_action(&clone_dir, &pull).unwrap();
         assert!(!result.ok, "ff-only pull must refuse to merge divergent history");
+
+        fs::remove_dir_all(&clone_dir).ok();
+    }
+
+    #[test]
+    fn pull_works_on_a_branch_without_an_upstream() {
+        let origin = TempRepo::new();
+        write_file(origin.path(), "a.txt", "one\n");
+        commit_all(origin.path(), "seed");
+        run(origin.path(), &["branch", "feature"]);
+
+        let clone_dir = std::env::temp_dir().join(format!("gitc-pull-noup-{}", std::process::id()));
+        fs::remove_dir_all(&clone_dir).ok();
+        run(
+            std::env::temp_dir().as_path(),
+            &["clone", origin.path().to_str().unwrap(), clone_dir.to_str().unwrap()],
+        );
+        // A local branch that tracks nothing, like one made with `git branch`.
+        run(&clone_dir, &["checkout", "--no-track", "-b", "feature", "origin/feature"]);
+
+        run(origin.path(), &["checkout", "feature"]);
+        write_file(origin.path(), "a.txt", "two\n");
+        commit_all(origin.path(), "origin work");
+        run(&clone_dir, &["fetch", "origin"]);
+
+        let result = run_action(&clone_dir, &act("pull")).unwrap();
+        assert!(result.ok, "pull failed: {}", result.stderr);
+        assert_eq!(fs::read_to_string(clone_dir.join("a.txt")).unwrap(), "two\n");
+        let upstream = run(&clone_dir, &["rev-parse", "--abbrev-ref", "@{upstream}"]);
+        assert_eq!(upstream.stdout.trim(), "origin/feature", "pull should set the upstream");
+
+        // Every pull mode handles a branch without an upstream.
+        for kind in ["pull", "pullMerge", "pullRebase"] {
+            run(&clone_dir, &["branch", "--unset-upstream"]);
+            let result = run_action(&clone_dir, &act(kind)).unwrap();
+            assert!(result.ok, "{kind} failed: {}", result.stderr);
+        }
+
+        // No same-named branch on the remote: a clear error, not git's.
+        run(&clone_dir, &["checkout", "-b", "local-only"]);
+        let result = run_action(&clone_dir, &act("pull")).unwrap();
+        assert!(!result.ok);
+        assert!(result.stderr.contains("no upstream"), "{}", result.stderr);
 
         fs::remove_dir_all(&clone_dir).ok();
     }
