@@ -21,6 +21,8 @@ pub struct GhRepo {
     pub name: String,
     pub name_with_owner: String,
     pub owner: String,
+    /// `true` when the owner is an organization rather than a user.
+    pub owner_is_org: bool,
     pub description: Option<String>,
     pub is_private: bool,
     pub is_fork: bool,
@@ -30,6 +32,8 @@ pub struct GhRepo {
     pub ssh_url: String,
     pub language: Option<String>,
     pub default_branch: Option<String>,
+    /// `owner/name` of the repository this one was forked from.
+    pub parent: Option<String>,
 }
 
 const GH_HOST: &str = "github.com";
@@ -81,38 +85,54 @@ pub fn gh_status() -> Result<GhStatus, String> {
     }
 }
 
+/// Every repository the signed-in user can reach — their own, their
+/// organizations', and ones they collaborate on — most recently pushed
+/// first. One paginated REST call (`gh repo list` only covers one owner).
 #[tauri::command(async)]
-pub fn gh_repo_list(owner: Option<String>, limit: Option<u32>) -> Result<Vec<GhRepo>, String> {
+pub fn gh_repo_list() -> Result<Vec<GhRepo>, String> {
     let gh_path = resolve_gh()
         .ok_or_else(|| "GitHub CLI not found; install with `brew install gh`.".to_string())?;
-    if let Some(owner) = owner.as_deref() {
-        validate_owner(owner)?;
-    }
-    let limit = limit.unwrap_or(100).clamp(1, 500).to_string();
-
-    let mut args: Vec<String> = vec!["repo".to_string(), "list".to_string()];
-    if let Some(owner) = owner.as_deref() {
-        args.push(owner.to_string());
-    }
-    args.push("--limit".to_string());
-    args.push(limit);
-    args.push("--json".to_string());
-    args.push(
-        "name,nameWithOwner,owner,description,isPrivate,isFork,isArchived,pushedAt,url,sshUrl,primaryLanguage,defaultBranchRef"
-            .to_string(),
-    );
-
     let mut command = Command::new(&gh_path);
-    command.args(args.iter().map(String::as_str));
+    command.args([
+        "api",
+        "--paginate",
+        "user/repos?per_page=100&sort=pushed&affiliation=owner,collaborator,organization_member",
+        "--jq",
+        ".[]",
+    ]);
     let result = run_command(&mut command, false);
     if !result.ok {
         return Err(if result.stderr.trim().is_empty() {
-            format!("gh repo list failed with exit code {}", result.code)
+            format!("gh api user/repos failed with exit code {}", result.code)
         } else {
             result.stderr.trim().to_string()
         });
     }
     parse_repo_list(&result.stdout)
+}
+
+/// `owner/name` of the repository a fork was made from. The list endpoint
+/// leaves this out, so the dialog asks when a fork is selected.
+#[tauri::command(async)]
+pub fn gh_repo_parent(name_with_owner: String) -> Result<Option<String>, String> {
+    let (owner, name) = name_with_owner
+        .split_once('/')
+        .ok_or_else(|| "expected owner/name".to_string())?;
+    validate_owner(owner)?;
+    validate_owner(name)?;
+    let gh_path = resolve_gh().ok_or_else(|| "GitHub CLI not found".to_string())?;
+    let mut command = Command::new(&gh_path);
+    command.args([
+        "api",
+        &format!("repos/{owner}/{name}"),
+        "--jq",
+        ".parent.full_name // empty",
+    ]);
+    let result = run_command(&mut command, false);
+    if !result.ok {
+        return Err(result.stderr.trim().to_string());
+    }
+    Ok(Some(result.stdout.trim().to_string()).filter(|parent| !parent.is_empty()))
 }
 
 /// Resolve an absolute path to the `gh` binary without ever spawning a
@@ -185,60 +205,61 @@ pub(crate) fn validate_owner(owner: &str) -> Result<(), String> {
 #[derive(Debug, Deserialize)]
 struct RawOwner {
     login: String,
+    #[serde(rename = "type", default)]
+    kind: Option<String>,
 }
 
+/// One element of `GET /user/repos` (REST field names).
 #[derive(Debug, Deserialize)]
-struct RawLanguage {
-    name: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct RawBranchRef {
-    name: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
 struct RawRepo {
     name: String,
-    name_with_owner: String,
+    full_name: String,
     owner: RawOwner,
     #[serde(default)]
     description: Option<String>,
-    is_private: bool,
-    is_fork: bool,
-    is_archived: bool,
+    #[serde(default)]
+    private: bool,
+    #[serde(default)]
+    fork: bool,
+    #[serde(default)]
+    archived: bool,
     #[serde(default)]
     pushed_at: Option<String>,
-    url: String,
+    html_url: String,
     ssh_url: String,
     #[serde(default)]
-    primary_language: Option<RawLanguage>,
+    language: Option<String>,
     #[serde(default)]
-    default_branch_ref: Option<RawBranchRef>,
+    default_branch: Option<String>,
 }
 
-/// Pure parse of `gh repo list --json ...`'s stdout.
-pub(crate) fn parse_repo_list(json: &str) -> Result<Vec<GhRepo>, String> {
-    let raw: Vec<RawRepo> = serde_json::from_str(json).map_err(|err| err.to_string())?;
-    Ok(raw
-        .into_iter()
-        .map(|repo| GhRepo {
-            name: repo.name,
-            name_with_owner: repo.name_with_owner,
-            owner: repo.owner.login,
-            // gh prints "" rather than null for a repo with no description.
-            description: repo.description.filter(|d| !d.trim().is_empty()),
-            is_private: repo.is_private,
-            is_fork: repo.is_fork,
-            is_archived: repo.is_archived,
-            pushed_at: repo.pushed_at,
-            url: repo.url,
-            ssh_url: repo.ssh_url,
-            language: repo.primary_language.map(|lang| lang.name),
-            default_branch: repo.default_branch_ref.map(|branch_ref| branch_ref.name),
+/// Pure parse of `gh api --paginate user/repos --jq '.[]'`: one JSON object
+/// per line.
+pub(crate) fn parse_repo_list(ndjson: &str) -> Result<Vec<GhRepo>, String> {
+    ndjson
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(|line| {
+            let repo: RawRepo = serde_json::from_str(line).map_err(|err| err.to_string())?;
+            Ok(GhRepo {
+                name: repo.name,
+                name_with_owner: repo.full_name,
+                owner_is_org: repo.owner.kind.as_deref() == Some("Organization"),
+                owner: repo.owner.login,
+                description: repo.description.filter(|d| !d.trim().is_empty()),
+                is_private: repo.private,
+                is_fork: repo.fork,
+                is_archived: repo.archived,
+                pushed_at: repo.pushed_at,
+                url: repo.html_url,
+                ssh_url: repo.ssh_url,
+                language: repo.language,
+                default_branch: repo.default_branch,
+                parent: None,
+            })
         })
-        .collect())
+        .collect()
 }
 
 #[allow(unused_imports)]
@@ -272,54 +293,25 @@ mod tests {
     }
 
     #[test]
-    fn parses_repo_list_json_sample() {
-        // Verified sample: null primaryLanguage on the first repo, missing
-        // defaultBranchRef key entirely on the first repo, empty description.
-        let json = r#"[
-            {
-                "name": "gitc",
-                "nameWithOwner": "dillonco/gitc",
-                "owner": {"id": "MDQ6VXNlcjE=", "login": "dillonco"},
-                "description": "",
-                "isPrivate": false,
-                "isFork": false,
-                "isArchived": false,
-                "pushedAt": "2026-09-05T19:24:10Z",
-                "url": "https://github.com/dillonco/gitc",
-                "sshUrl": "git@github.com:dillonco/gitc.git",
-                "primaryLanguage": null
-            },
-            {
-                "name": "forked",
-                "nameWithOwner": "someone/forked",
-                "owner": {"id": "MDQ6VXNlcjI=", "login": "someone"},
-                "description": "A fork",
-                "isPrivate": true,
-                "isFork": true,
-                "isArchived": true,
-                "pushedAt": null,
-                "url": "https://github.com/someone/forked",
-                "sshUrl": "git@github.com:someone/forked.git",
-                "primaryLanguage": {"name": "Rust"},
-                "defaultBranchRef": {"name": "main"}
-            }
-        ]"#;
-        let repos = parse_repo_list(json).expect("valid json parses");
+    fn parses_repo_list_ndjson_sample() {
+        let ndjson = concat!(
+            r#"{"name":"gitc","full_name":"dillonco/gitc","owner":{"login":"dillonco","id":1},"description":"","private":false,"fork":false,"archived":false,"pushed_at":"2026-09-05T19:24:10Z","html_url":"https://github.com/dillonco/gitc","ssh_url":"git@github.com:dillonco/gitc.git","language":null,"default_branch":"main"}"#,
+            "\n",
+            r#"{"name":"forked","full_name":"some-org/forked","owner":{"login":"some-org","type":"Organization"},"description":"A fork","private":true,"fork":true,"archived":true,"pushed_at":null,"html_url":"https://github.com/some-org/forked","ssh_url":"git@github.com:some-org/forked.git","language":"Rust"}"#,
+            "\n"
+        );
+        let repos = parse_repo_list(ndjson).expect("valid ndjson parses");
         assert_eq!(repos.len(), 2);
-
-        assert_eq!(repos[0].name, "gitc");
-        assert_eq!(repos[0].owner, "dillonco");
+        assert_eq!(repos[0].name_with_owner, "dillonco/gitc");
         assert_eq!(repos[0].description, None, "empty string becomes None");
         assert_eq!(repos[0].language, None);
-        assert_eq!(repos[0].default_branch, None, "missing key becomes None");
-        assert!(!repos[0].is_private);
-
-        assert_eq!(repos[1].owner, "someone");
-        assert_eq!(repos[1].description.as_deref(), Some("A fork"));
+        assert_eq!(repos[0].default_branch.as_deref(), Some("main"));
+        assert_eq!(repos[1].owner, "some-org");
+        assert!(repos[1].owner_is_org && !repos[0].owner_is_org);
         assert_eq!(repos[1].language.as_deref(), Some("Rust"));
-        assert_eq!(repos[1].default_branch.as_deref(), Some("main"));
+        assert_eq!(repos[1].default_branch, None, "missing key becomes None");
         assert!(repos[1].is_private && repos[1].is_fork && repos[1].is_archived);
-        assert_eq!(repos[1].pushed_at, None);
+        assert!(parse_repo_list("").unwrap().is_empty());
     }
 
     #[test]

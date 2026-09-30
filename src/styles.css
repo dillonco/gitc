@@ -55,14 +55,14 @@
   --panel: #272a32;
   --chrome: #33373f;
   --chrome-edge: #2b2d35;
-  --ink: #c9cacb;
+  --ink: #d3d5d8;
   --ink-message: #c6c6c8;
-  --ink-dim: #7e7f83;
-  --ink-label: #a9aaad;
-  --ink-body-dim: #828386;
+  --ink-dim: #9a9ca2;
+  --ink-label: #b9bbbf;
+  --ink-body-dim: #979a9f;
   --placeholder: #a6a7a9;
-  --placeholder-dim: #797a7d;
-  --ink-disabled: #7a7d7f;
+  --placeholder-dim: #8b8d92;
+  --ink-disabled: #85888c;
   --edge: #393b42;
   --edge-hi: #52555b;
   --sidebar-edge: #2e3034;
@@ -3382,4 +3382,1297 @@ summary::-webkit-details-marker {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ==== Button system =====================================================
+   Every action button shares one frosted-glass look, in three roles:
+   glass (neutral), primary (green) and destructive (red). The gradients
+   drift slowly and speed up with a soft glow on hover. Only the surface is
+   set here (background, border, shadow, weight, corners); each context
+   keeps its own height, padding and font size. Sidebar rows, tabs, trees,
+   menus and the toolbar are not action buttons and are left alone.
+   Selectors use :is() and sit at the end of the file so they win over the
+   per-context rules above at equal specificity. */
+
+:root {
+  --btn-radius: 6px;
+  --btn-glass-sheen: linear-gradient(
+    115deg,
+    rgb(255 255 255 / 0.07) 0%,
+    rgb(255 255 255 / 0.02) 35%,
+    rgb(125 211 252 / 0.1) 50%,
+    rgb(255 255 255 / 0.02) 65%,
+    rgb(255 255 255 / 0.06) 100%
+  );
+  --btn-glass-base: rgb(44 48 57 / 0.6);
+  --btn-green: linear-gradient(115deg, #1c9645 0%, #2cb955 28%, #45d98c 50%, #2cb955 72%, #1c9645 100%);
+  --btn-red: linear-gradient(115deg, #a02d36 0%, #c9434a 28%, #e8665f 50%, #c9434a 72%, #a02d36 100%);
+  --btn-focus: 0 0 0 3px rgb(56 189 248 / 0.45);
+}
+
+@keyframes btn-drift {
+  from {
+    background-position: 0% 50%, 0 0;
+  }
+  to {
+    background-position: 100% 50%, 0 0;
+  }
+}
+
+/* ---- glass (neutral) ---- */
+
+:is(
+    .btn,
+    .modal-footer button,
+    .launch-actions button,
+    .banner-actions button,
+    .button-row button,
+    .mini-actions button,
+    .stash-actions button,
+    .commit-actions button,
+    .reset-mode-row button,
+    .hunk-toolbar button,
+    .file-diff-actions button,
+    .preflight-banner button,
+    .action-cell button
+  ) {
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: var(--btn-radius);
+  background: var(--btn-glass-sheen) 0% 50% / 250% 100%, var(--btn-glass-base);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  backdrop-filter: blur(10px) saturate(140%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.08),
+    0 1px 2px rgb(0 0 0 / 0.3);
+  color: #e6eaf0;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition:
+    border-color 160ms ease,
+    box-shadow 220ms ease,
+    color 160ms ease,
+    filter 160ms ease,
+    transform 80ms ease;
+}
+
+:is(
+    .btn,
+    .modal-footer button,
+    .launch-actions button,
+    .banner-actions button,
+    .button-row button,
+    .mini-actions button,
+    .stash-actions button,
+    .commit-actions button,
+    .reset-mode-row button,
+    .hunk-toolbar button,
+    .file-diff-actions button,
+    .preflight-banner button,
+    .action-cell button
+  ):hover:not(:disabled) {
+  border-color: rgb(125 211 252 / 0.38);
+  background: var(--btn-glass-sheen) 0% 50% / 250% 100%, rgb(52 57 68 / 0.7);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.12),
+    0 0 0 1px rgb(125 211 252 / 0.08),
+    0 0 16px rgb(56 189 248 / 0.2);
+  color: #fff;
+  animation: btn-drift 2.8s ease-in-out infinite alternate;
+}
+
+/* ---- primary (green) ---- */
+
+:is(.btn-primary, .stage-file, .commit-button, .change-group-head button:not(.section-toggle)) {
+  border: 1px solid rgb(110 231 160 / 0.55);
+  border-radius: var(--btn-radius);
+  background: var(--btn-green) 0% 50% / 300% 100%;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.28),
+    inset 0 -1px 0 rgb(0 0 0 / 0.15),
+    0 0 12px rgb(47 191 87 / 0.28),
+    0 1px 2px rgb(0 0 0 / 0.35);
+  color: #fff;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-shadow: 0 1px 1px rgb(0 0 0 / 0.25);
+  animation: btn-drift 7s ease-in-out infinite alternate;
+  transition:
+    border-color 160ms ease,
+    box-shadow 220ms ease,
+    filter 160ms ease,
+    transform 80ms ease;
+}
+
+:is(.btn-primary, .stage-file, .commit-button, .change-group-head button:not(.section-toggle)):hover:not(:disabled) {
+  border-color: rgb(134 239 172 / 0.85);
+  background: var(--btn-green) 0% 50% / 300% 100%;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.32),
+    inset 0 -1px 0 rgb(0 0 0 / 0.12),
+    0 0 0 3px rgb(47 191 87 / 0.18),
+    0 0 22px rgb(67 217 138 / 0.45);
+  color: #fff;
+  filter: brightness(1.06) saturate(1.08);
+  animation-duration: 2.4s;
+}
+
+/* ---- destructive (red) ---- */
+
+:is(.danger-fill, .change-group-head.compact button:not(.section-toggle)) {
+  border: 1px solid rgb(252 165 165 / 0.5);
+  background: var(--btn-red) 0% 50% / 300% 100%;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.22),
+    inset 0 -1px 0 rgb(0 0 0 / 0.15),
+    0 0 12px rgb(220 70 75 / 0.25),
+    0 1px 2px rgb(0 0 0 / 0.35);
+  color: #fff;
+  animation: btn-drift 7s ease-in-out infinite alternate;
+}
+
+:is(.danger-fill, .change-group-head.compact button:not(.section-toggle)):hover:not(:disabled) {
+  border-color: rgb(254 202 202 / 0.85);
+  background: var(--btn-red) 0% 50% / 300% 100%;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.26),
+    0 0 0 3px rgb(239 68 68 / 0.18),
+    0 0 22px rgb(248 113 113 / 0.42);
+  color: #fff;
+  filter: brightness(1.06);
+  animation-duration: 2.4s;
+}
+
+/* Outlined destructive actions (drop, discard, reset): red-tinted glass. */
+button.danger {
+  border-color: rgb(248 113 113 / 0.45);
+  color: #ffc9c9;
+}
+
+button.danger:hover:not(:disabled) {
+  border-color: rgb(252 165 165 / 0.8);
+  background: var(--btn-glass-sheen) 0% 50% / 250% 100%, rgb(127 29 29 / 0.35);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.1),
+    0 0 16px rgb(248 113 113 / 0.3);
+  color: #fff;
+}
+
+/* ---- shared states ---- */
+
+:is(
+    .btn,
+    .btn-primary,
+    .stage-file,
+    .commit-button,
+    .danger-fill,
+    .change-group-head button,
+    .modal-footer button,
+    .launch-actions button,
+    .banner-actions button,
+    .button-row button,
+    .mini-actions button,
+    .stash-actions button,
+    .commit-actions button,
+    .reset-mode-row button,
+    .hunk-toolbar button,
+    .file-diff-actions button,
+    .preflight-banner button,
+    .action-cell button
+  ):not(.section-toggle):active:not(:disabled) {
+  transform: translateY(1px);
+  filter: brightness(0.95);
+}
+
+:is(
+    .btn,
+    .btn-primary,
+    .stage-file,
+    .commit-button,
+    .danger-fill,
+    .change-group-head button,
+    .modal-footer button,
+    .launch-actions button,
+    .banner-actions button,
+    .button-row button,
+    .mini-actions button,
+    .stash-actions button,
+    .commit-actions button,
+    .reset-mode-row button,
+    .hunk-toolbar button,
+    .file-diff-actions button,
+    .preflight-banner button,
+    .action-cell button
+  ):not(.section-toggle):focus-visible {
+  outline: none;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.12),
+    var(--btn-focus);
+}
+
+:is(.btn, .modal-footer button, .launch-actions button, .banner-actions button, .button-row button, .mini-actions button, .stash-actions button, .commit-actions button, .reset-mode-row button, .hunk-toolbar button, .file-diff-actions button, .preflight-banner button, .action-cell button):disabled {
+  box-shadow: none;
+  opacity: 0.5;
+  animation: none;
+}
+
+/* Disabled primaries and destructives stay tinted so they still read as
+   the main action, just asleep. */
+:is(.btn-primary, .stage-file, .commit-button, .change-group-head button:not(.section-toggle)):disabled {
+  border-color: rgb(47 191 87 / 0.3);
+  background: rgb(47 191 87 / 0.14);
+  box-shadow: none;
+  color: rgb(214 245 224 / 0.5);
+  text-shadow: none;
+  animation: none;
+  opacity: 1;
+}
+
+:is(.danger-fill, .change-group-head.compact button:not(.section-toggle)):disabled {
+  border-color: rgb(220 70 75 / 0.3);
+  background: rgb(220 70 75 / 0.14);
+  box-shadow: none;
+  color: rgb(255 214 214 / 0.5);
+  text-shadow: none;
+  animation: none;
+  opacity: 1;
+}
+
+/* Dialog footers: every button the same size, primary or not. */
+.modal-footer button {
+  min-height: 30px;
+  padding: 0 14px;
+  font-size: 12.5px;
+}
+
+/* Unified / Split in the diff header are toggles: plain, like the rest. */
+.file-diff-actions button[aria-pressed],
+.file-diff-actions button.active,
+.file-diff-actions button[title="Unified"],
+.file-diff-actions button[title="Split"] {
+  border-color: transparent;
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+  color: var(--ink-dim);
+  animation: none;
+}
+
+.file-diff-actions button[title="Unified"]:hover:not(:disabled),
+.file-diff-actions button[title="Split"]:hover:not(:disabled) {
+  border-color: transparent;
+  background: rgb(255 255 255 / 0.06);
+  box-shadow: none;
+  color: var(--ink);
+  animation: none;
+}
+
+.file-diff-actions button.active,
+.file-diff-actions button.active:hover:not(:disabled) {
+  border-color: transparent;
+  background: rgb(255 255 255 / 0.12);
+  color: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.btn, .btn-primary, .stage-file, .commit-button, .danger-fill, .change-group-head button, .modal-footer button, .launch-actions button, .banner-actions button, .button-row button, .mini-actions button, .stash-actions button, .commit-actions button, .reset-mode-row button, .hunk-toolbar button, .file-diff-actions button, .preflight-banner button, .action-cell button),
+  :is(.btn, .btn-primary, .stage-file, .commit-button, .danger-fill, .change-group-head button, .modal-footer button, .launch-actions button, .banner-actions button, .button-row button, .mini-actions button, .stash-actions button, .commit-actions button, .reset-mode-row button, .hunk-toolbar button, .file-diff-actions button, .preflight-banner button, .action-cell button):hover:not(:disabled) {
+    animation: none;
+  }
+}
+
+/* ==== Interaction polish ===================================================
+   Everything that isn't an action button: tabs, toolbar, menus, sidebar,
+   graph rows, file lists, the commit panel and dialogs. Rows become inset,
+   rounded targets with a hover wash; selection gets a coloured accent bar;
+   icons pick up the accent colour on hover. Heights of the app's grid rows
+   and list rows are unchanged, so nothing reflows. */
+
+:root {
+  --accent: #38bdf8;
+  --accent-soft: rgb(56 189 248 / 0.14);
+  --accent-ring: 0 0 0 2px rgb(56 189 248 / 0.5);
+  --hover-wash: rgb(255 255 255 / 0.055);
+  --hover-wash-strong: rgb(255 255 255 / 0.085);
+  --row-radius: 6px;
+  --select-grad: linear-gradient(90deg, rgb(56 139 253 / 0.28), rgb(56 139 253 / 0.12));
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Keyboard focus is always visible, for every control without its own ring. */
+button:focus-visible,
+summary:focus-visible,
+[role="option"]:focus-visible {
+  outline: 2px solid rgb(56 189 248 / 0.6);
+  outline-offset: -2px;
+}
+
+/* ---- tab strip ---- */
+
+.tab {
+  position: relative;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease;
+}
+
+.tab:hover:not(.active) {
+  background: var(--hover-wash);
+  color: #eef1f5;
+}
+
+.tab.active {
+  background: var(--panel);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* The active tab carries an accent line along its top edge. */
+.tab.active::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #22d3ee, #38bdf8 50%, #818cf8);
+  box-shadow: 0 0 10px rgb(56 189 248 / 0.55);
+}
+
+.tab-wrap .tab-close {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  min-height: 0;
+  border-radius: 5px;
+  font-size: 15px;
+  transition:
+    opacity 120ms ease,
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.tab-wrap .tab-close:hover {
+  background: rgb(248 113 113 / 0.18);
+  color: #fecaca;
+  opacity: 1;
+}
+
+.add-tab {
+  transition:
+    background-color 140ms ease,
+    color 140ms ease;
+}
+
+/* The + is a compact square button, not a tab: it drops the tab's padding
+   (which reserves room for a close ×) so the glyph sits centred, and its
+   hover fill is exactly the button's own box. */
+.tab.add-tab {
+  align-self: center;
+  justify-content: center;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  min-height: 0;
+  margin-left: 6px;
+  padding: 0 0 2px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.tab.add-tab:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--hover-wash-strong);
+  color: var(--accent);
+}
+
+/* ---- repository bar ---- */
+
+.repo-select,
+.branch-select {
+  transition: background-color 140ms ease;
+}
+
+.repo-select:hover:not(:disabled),
+.branch-select:hover:not(:disabled) {
+  border-color: #5c5f66;
+  background: var(--hover-wash);
+}
+
+.repo-select:hover:not(:disabled) strong,
+.branch-select:hover:not(:disabled) strong {
+  color: #fff;
+}
+
+.branch-select.active {
+  background: var(--accent-soft);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+/* Toolbar commands: a rounded glass tile appears under the icon on hover,
+   and the icon picks up the accent colour. Each tile is inset 3px from the
+   bar's edges; inside it a 12px label line, 2px gap and 15px icon leave the
+   same ~5px above the label and below the icon. */
+.top-actions button,
+.search-actions button {
+  gap: 2px;
+  margin: 3px 1px;
+  padding-top: 0;
+  padding-bottom: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    box-shadow 180ms ease,
+    transform 80ms ease;
+}
+
+.top-actions button:hover:not(:disabled),
+.search-actions button:hover:not(:disabled) {
+  border-color: rgb(255 255 255 / 0.1);
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.09), rgb(255 255 255 / 0.03));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.08),
+    0 0 14px rgb(56 189 248 / 0.12);
+}
+
+.top-actions button:active:not(:disabled),
+.search-actions button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.top-actions button span,
+.search-actions button span {
+  line-height: 12px;
+}
+
+/* Keep the last tile off the window's right edge. */
+.search-actions {
+  padding-right: 6px;
+}
+
+.top-actions .toolbar-icon,
+.search-actions .toolbar-icon {
+  width: 15px;
+  height: 15px;
+}
+
+/* Pull and its mode caret read as one split tile: joined edges, and hovering
+   either half lights both. The caret sits level with the icons. */
+.top-actions .pull-split > button:first-child {
+  margin-right: 0;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.top-actions .pull-split > .pull-caret {
+  justify-content: flex-start;
+  min-width: 18px;
+  margin-left: 0;
+  padding: 0 4px 6px 2px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.top-actions .pull-caret .caret-icon {
+  margin: 0;
+}
+
+.top-actions .pull-split:hover > button:not(:disabled) {
+  border-color: rgb(255 255 255 / 0.1);
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.09), rgb(255 255 255 / 0.03));
+}
+
+.top-actions .pull-split:hover > button:first-child:not(:disabled) {
+  border-right-color: rgb(255 255 255 / 0.06);
+}
+
+.top-actions .pull-split:hover > .pull-caret:not(:disabled) {
+  border-left-color: transparent;
+}
+
+.toolbar-icon {
+  transition:
+    color 140ms ease,
+    filter 180ms ease;
+}
+
+.top-actions button:hover:not(:disabled) .toolbar-icon,
+.search-actions button:hover:not(:disabled) .toolbar-icon {
+  color: #7dd3fc;
+  filter: drop-shadow(0 0 5px rgb(56 189 248 / 0.55));
+}
+
+.top-actions button:hover:not(:disabled) span,
+.search-actions button:hover:not(:disabled) span {
+  color: #e6eaf0;
+}
+
+.top-actions button:disabled,
+.search-actions button:disabled {
+  opacity: 0.4;
+}
+
+/* Menus inside the toolbar are plain rows, not tiles. */
+.top-actions .dropdown-menu button,
+.search-actions .dropdown-menu button {
+  margin: 0;
+  box-shadow: none;
+}
+
+/* ---- dropdown menus ---- */
+
+.dropdown-menu {
+  gap: 1px;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 10px;
+  background: rgb(36 39 47 / 0.9);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  backdrop-filter: blur(18px) saturate(150%);
+  box-shadow:
+    0 18px 44px rgb(0 0 0 / 0.55),
+    inset 0 1px 0 rgb(255 255 255 / 0.06);
+  padding: 6px;
+  animation: menu-in 130ms var(--ease-out);
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+
+.dropdown-menu button,
+.top-actions .dropdown-menu button,
+.search-actions .dropdown-menu button,
+.branch-menu button {
+  border: 0;
+  border-radius: 6px;
+  color: #dfe3e8;
+  transition:
+    background-color 100ms ease,
+    color 100ms ease;
+}
+
+.dropdown-menu button:hover:not(:disabled),
+.top-actions .dropdown-menu button:hover:not(:disabled),
+.search-actions .dropdown-menu button:hover:not(:disabled) {
+  border-color: transparent;
+  background: linear-gradient(90deg, rgb(56 189 248 / 0.22), rgb(56 189 248 / 0.08));
+  box-shadow: none;
+  color: #fff;
+}
+
+.dropdown-menu button.item-danger:hover:not(:disabled),
+.dropdown-menu button.danger:hover:not(:disabled) {
+  background: linear-gradient(90deg, rgb(248 113 113 / 0.24), rgb(248 113 113 / 0.08));
+  color: #fff;
+}
+
+/* ---- sidebar ---- */
+
+.filter-block input {
+  height: 26px;
+  border-radius: 6px;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.filter-block input:hover {
+  border-color: #464a52;
+}
+
+.filter-block input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgb(56 189 248 / 0.16);
+}
+
+.nav-row {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.nav-row:hover:not(:disabled) {
+  background: var(--hover-wash);
+  color: #eef1f5;
+}
+
+.nav-row:hover:not(:disabled) .nav-icon,
+.nav-row:hover:not(:disabled) .nav-chevron {
+  color: var(--accent);
+}
+
+.nav-row .nav-chevron {
+  font-size: 11px;
+  transition: color 120ms ease;
+}
+
+/* Section counts become small pills. */
+.nav-row strong {
+  justify-self: end;
+  min-width: 20px;
+  border-radius: 9px;
+  background: rgb(147 170 236 / 0.14);
+  padding: 1px 6px;
+  color: #b6c6f5;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-align: center;
+}
+
+/* Rows are inset, rounded targets. */
+.branch-list,
+.worktree-list,
+.stash-list {
+  padding: 2px 6px 6px;
+}
+
+.branch-list .branch-name,
+.ref-tree-dir {
+  border-radius: var(--row-radius);
+  padding-left: calc(10px + var(--depth, 0) * 16px);
+  transition:
+    background-color 110ms ease,
+    color 110ms ease;
+}
+
+.branch-list .branch-name:hover:not(:disabled),
+.ref-tree-dir:hover:not(:disabled),
+.worktree-row .worktree-main:hover:not(:disabled) {
+  background: var(--hover-wash-strong);
+  color: #fff;
+}
+
+.branch-list .branch-name:hover:not(:disabled) .tree-icon,
+.ref-tree-dir:hover:not(:disabled) .tree-icon {
+  color: var(--accent);
+}
+
+.tree-icon {
+  transition: color 110ms ease;
+}
+
+/* The checked-out branch: green wash with an accent bar. */
+.branch-row.active .branch-name {
+  background: linear-gradient(90deg, rgb(63 185 80 / 0.3), rgb(63 185 80 / 0.1));
+  box-shadow: inset 3px 0 0 #3fb950;
+  color: #e7f8ea;
+  font-weight: 600;
+}
+
+.branch-row.active .branch-name .tree-icon {
+  color: #56d364;
+}
+
+.branch-check {
+  background: linear-gradient(180deg, #56d364, #2ea043);
+  box-shadow: 0 0 6px rgb(86 211 100 / 0.5);
+}
+
+/* An empty check slot only reserves space in the branch menu. */
+.branch-check:empty,
+.branch-menu .branch-check:empty {
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Per-row actions (checkout, delete…) appear as small glass squares. */
+.branch-row .row-action,
+.worktree-row .row-action {
+  margin: 2px 0;
+  border: 1px solid transparent;
+  border-radius: var(--row-radius);
+  color: var(--ink-dim);
+  transition:
+    opacity 120ms ease,
+    background-color 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
+}
+
+.branch-row .row-action:hover:not(:disabled),
+.worktree-row .row-action:hover:not(:disabled) {
+  border-color: rgb(255 255 255 / 0.12);
+  background: rgb(255 255 255 / 0.08);
+  color: #fff;
+}
+
+.branch-row .row-action.danger,
+.worktree-row .row-action.danger {
+  border-color: transparent;
+}
+
+.branch-row .row-action.danger:hover:not(:disabled),
+.worktree-row .row-action.danger:hover:not(:disabled) {
+  border-color: rgb(248 113 113 / 0.45);
+  background: rgb(248 113 113 / 0.16);
+  color: #fecaca;
+}
+
+.worktree-row .worktree-main {
+  border-radius: var(--row-radius);
+  transition: background-color 110ms ease;
+}
+
+.worktree-row.active .worktree-main {
+  background: var(--select-grad);
+  box-shadow: inset 3px 0 0 #58a6ff;
+}
+
+.worktree-row.active .wt-dot {
+  box-shadow: 0 0 6px rgb(89 211 165 / 0.7);
+}
+
+.stash-row {
+  border-radius: var(--row-radius);
+}
+
+.stash-row:hover,
+.stash-row:focus-within {
+  background: var(--hover-wash-strong);
+}
+
+.stash-actions {
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: 8px;
+  background: rgb(30 33 40 / 0.85);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+.section-head .section-action {
+  border-radius: 5px;
+  font-weight: 600;
+}
+
+.section-head .section-action:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: #bae6fd;
+}
+
+/* ---- commit graph ---- */
+
+.commit-row {
+  transition: background-color 90ms ease;
+}
+
+.commit-row:hover:not(:disabled) {
+  background: rgb(255 255 255 / 0.05);
+}
+
+.commit-row.active,
+.commit-row.active:hover:not(:disabled) {
+  background: linear-gradient(90deg, rgb(56 139 253 / 0.3), rgb(56 139 253 / 0.14) 60%, rgb(56 139 253 / 0.08));
+  box-shadow: inset 3px 0 0 #58a6ff;
+}
+
+.ref-pill {
+  border-radius: 5px;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ref-color) 45%, transparent);
+  transition:
+    filter 120ms ease,
+    box-shadow 160ms ease;
+}
+
+.ref-pill:hover {
+  filter: brightness(1.18);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--ref-color) 70%, transparent),
+    0 0 10px color-mix(in srgb, var(--ref-color) 40%, transparent);
+}
+
+.ref-pill.head {
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--ref-color) 80%, white 10%),
+    0 0 8px color-mix(in srgb, var(--ref-color) 35%, transparent);
+}
+
+.graph-settings {
+  border-radius: 4px;
+  transition:
+    color 120ms ease,
+    transform 300ms var(--ease-out);
+}
+
+.graph-settings:hover:not(:disabled) {
+  background: transparent;
+  color: var(--accent);
+  transform: rotate(60deg);
+}
+
+/* ---- segmented controls (Path / Tree, GitHub / URL, diff modes) ----
+   Toggles, not actions, so they stay plain: text on the panel, a faint wash
+   on hover, and a quiet fill for the selected option. No borders, gradients
+   or glow. */
+
+.segmented {
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.segmented button,
+.segmented button + button {
+  margin: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--ink-dim);
+  font-weight: 600;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.segmented button:not(.active):hover:not(:disabled) {
+  border-color: transparent;
+  background: rgb(255 255 255 / 0.06);
+  color: var(--ink);
+}
+
+.segmented button.active,
+.segmented button.active:hover:not(:disabled) {
+  border-color: transparent;
+  background: rgb(255 255 255 / 0.12);
+  box-shadow: none;
+  color: #fff;
+}
+
+/* ---- right panel: changes list ---- */
+
+.changes-title-branch {
+  border-radius: 4px;
+  box-shadow: 0 0 8px rgb(25 89 105 / 0.6);
+}
+
+.refresh-btn,
+.trash {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 22px;
+  border-radius: 6px;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease,
+    box-shadow 160ms ease;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  border-color: rgb(56 189 248 / 0.5);
+  background: var(--accent-soft);
+  box-shadow: 0 0 10px rgb(56 189 248 / 0.25);
+  color: #bae6fd;
+}
+
+.trash:hover:not(:disabled) {
+  border-color: rgb(252 165 165 / 0.7);
+  background: rgb(220 70 75 / 0.35);
+  box-shadow: 0 0 10px rgb(248 113 113 / 0.3);
+  color: #fff;
+}
+
+.sort-btn {
+  border-radius: 5px;
+  padding: 3px 5px;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.sort-btn:hover:not(:disabled) {
+  background: var(--hover-wash-strong);
+  color: var(--accent);
+}
+
+.change-group-head .section-toggle:hover .chevron,
+.change-group-head .section-toggle:hover {
+  color: #fff;
+}
+
+.files {
+  padding: 2px 6px;
+}
+
+.file-row,
+.commit-file-row {
+  border-radius: var(--row-radius);
+  transition: background-color 90ms ease;
+}
+
+.file-row:hover,
+.commit-file-row:hover:not(:disabled) {
+  background: rgb(88 166 255 / 0.09);
+}
+
+.file-row.active,
+.commit-file-row.active {
+  background: var(--select-grad);
+  box-shadow: inset 3px 0 0 #58a6ff;
+}
+
+.file-row:hover .file-name strong,
+.file-row.active .file-name strong {
+  color: #fff;
+}
+
+.file-name {
+  border-radius: var(--row-radius);
+}
+
+.file-name:hover:not(:disabled) {
+  border-color: transparent;
+  background: transparent;
+}
+
+/* ---- diff toolbar: plain toggles and icon buttons ---- */
+
+.file-diff-toolbar .segmented button,
+.diff-tool-group button {
+  width: auto;
+  height: 24px;
+  min-height: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--ink-dim);
+  font-weight: 600;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.diff-tool-group button {
+  min-width: 26px;
+  padding: 0 6px;
+}
+
+.file-diff-toolbar .segmented button:not(.active):hover:not(:disabled),
+.diff-tool-group button:not(.active):hover:not(:disabled) {
+  border-color: transparent;
+  background: rgb(255 255 255 / 0.06);
+  box-shadow: none;
+  color: var(--ink);
+}
+
+.file-diff-toolbar .segmented button.active,
+.file-diff-toolbar .segmented button.active:hover:not(:disabled),
+.diff-tool-group button.active,
+.diff-tool-group button.active:hover:not(:disabled) {
+  border-color: transparent;
+  background: rgb(255 255 255 / 0.12);
+  box-shadow: none;
+  color: #fff;
+}
+
+/* Closing the diff reads as dismiss, so it warms to red. */
+.file-diff-actions button[title^="Close"]:hover:not(:disabled) {
+  border-color: rgb(248 113 113 / 0.45);
+  background: rgb(248 113 113 / 0.16);
+  color: #fecaca;
+}
+
+.tree-dir {
+  border-radius: var(--row-radius);
+  transition: background-color 90ms ease;
+}
+
+.tree-dir:hover:not(:disabled) {
+  background: var(--hover-wash);
+}
+
+/* Per-file Stage / Unstage / Discard: compact glass. */
+.file-actions button {
+  border: 1px solid rgb(255 255 255 / 0.14);
+  border-radius: 5px;
+  background: rgb(44 48 57 / 0.85);
+  color: #e6eaf0;
+  font-weight: 600;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    box-shadow 160ms ease;
+}
+
+.file-actions button:hover:not(:disabled) {
+  border-color: rgb(110 231 160 / 0.6);
+  background: rgb(47 191 87 / 0.28);
+  box-shadow: 0 0 10px rgb(47 191 87 / 0.3);
+  color: #fff;
+}
+
+.file-actions button.danger:hover:not(:disabled) {
+  border-color: rgb(252 165 165 / 0.7);
+  background: rgb(220 70 75 / 0.3);
+  box-shadow: 0 0 10px rgb(248 113 113 / 0.3);
+}
+
+/* ---- commit composer ---- */
+
+.commit-tab {
+  border-radius: 6px 6px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.commit-box {
+  border-radius: 8px;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.commit-box:hover {
+  border-color: #464a52;
+}
+
+.commit-box:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgb(56 189 248 / 0.14);
+}
+
+.options-toggle {
+  border-radius: 5px;
+  transition: color 120ms ease;
+}
+
+summary:hover .options-toggle {
+  color: #eef1f5;
+}
+
+summary:hover .options-toggle i {
+  color: var(--accent);
+}
+
+.options-toggle i {
+  display: inline-block;
+  font-style: normal;
+  transition:
+    transform 150ms ease,
+    color 120ms ease;
+}
+
+details[open] > summary .options-toggle i {
+  transform: rotate(90deg);
+}
+
+/* ---- commit detail ---- */
+
+.commit-hash-btn {
+  border-radius: 5px;
+  padding: 3px 6px;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.commit-hash-btn:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: #bae6fd;
+}
+
+.commit-hash-btn:hover:not(:disabled) strong {
+  color: #fff;
+}
+
+.commit-message-card {
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.03), transparent), var(--input-bg);
+}
+
+/* ---- launchpad ---- */
+
+.launch-actions button {
+  font-size: 15px;
+}
+
+.recent-repos {
+  gap: 2px;
+}
+
+.recent-repos button {
+  min-width: 420px;
+  min-height: 32px;
+  border-radius: 8px;
+  padding: 0 12px;
+  transition:
+    background-color 120ms ease,
+    transform 120ms var(--ease-out);
+}
+
+.recent-repos button:hover:not(:disabled) {
+  background: var(--hover-wash-strong);
+  transform: translateX(3px);
+}
+
+.recent-repos button:hover:not(:disabled) strong {
+  color: #7dd3fc;
+  text-shadow: 0 0 12px rgb(56 189 248 / 0.45);
+}
+
+.recent-repos button:hover:not(:disabled) span {
+  color: var(--ink-label);
+}
+
+.recent-repos strong {
+  transition:
+    color 120ms ease,
+    text-shadow 160ms ease;
+}
+
+/* ---- dialogs ---- */
+
+.modal-backdrop {
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  animation: backdrop-in 140ms ease-out;
+}
+
+@keyframes backdrop-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.modal {
+  border-color: rgb(255 255 255 / 0.1);
+  border-radius: 12px;
+  box-shadow:
+    0 28px 70px rgb(0 0 0 / 0.6),
+    inset 0 1px 0 rgb(255 255 255 / 0.06);
+  animation: dialog-in 160ms var(--ease-out);
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+}
+
+.panel-title h1 {
+  font-weight: 600;
+}
+
+.panel-title > button {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  min-height: 0;
+  padding: 0;
+  border-radius: 6px;
+  color: var(--ink-dim);
+  font-size: 17px;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.panel-title > button:hover:not(:disabled) {
+  border-color: transparent;
+  background: rgb(248 113 113 / 0.16);
+  color: #fecaca;
+}
+
+.modal-footer {
+  background: rgb(0 0 0 / 0.12);
+}
+
+/* ---- text fields ---- */
+
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  border-radius: 6px;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):hover,
+select:hover,
+textarea:hover {
+  border-color: #474b53;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgb(56 189 248 / 0.16);
+}
+
+/* The commit message fields sit inside .commit-box, which carries the ring. */
+.commit-input input,
+.commit-input input:hover,
+.commit-input input:focus-visible,
+.description,
+.description:hover,
+.description:focus-visible {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+/* ---- checkboxes ---- */
+
+.checkbox input,
+.view-all-files input {
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.checkbox:hover input:not(:disabled),
+.view-all-files:hover input:not(:disabled) {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgb(56 189 248 / 0.14);
+}
+
+/* ---- toasts, tooltips, status bar ---- */
+
+.message.error,
+.message.ok {
+  border-radius: 10px;
+}
+
+.hover-expand {
+  border-color: rgb(255 255 255 / 0.12);
+  border-radius: 6px;
+  background: rgb(44 48 57 / 0.94);
+  box-shadow: 0 8px 22px rgb(0 0 0 / 0.5);
+}
+
+.status-bar {
+  background: linear-gradient(180deg, #2a2d35, var(--panel));
+  color: var(--ink-label);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dropdown-menu,
+  .modal,
+  .modal-backdrop {
+    animation: none;
+  }
+
+  .recent-repos button:hover:not(:disabled),
+  .graph-settings:hover:not(:disabled) {
+    transform: none;
+  }
 }

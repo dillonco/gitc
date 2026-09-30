@@ -1,5 +1,8 @@
 import type {
   BranchCleanupReport,
+  CloneProgress,
+  CloneRequest,
+  CloneTarget,
   CommitDetail,
   CommitGraph,
   ConflictFile,
@@ -9,6 +12,7 @@ import type {
   GitAction,
   GitResult,
   RebasePlan,
+  RemoteBranches,
   RebaseStep,
   RefCompare,
   RepositoryState,
@@ -60,16 +64,41 @@ export function openTerminal(): Promise<GitResult> {
   return call("open_terminal");
 }
 
-export function pickRepositoryFolder(): Promise<string | null> {
-  return call<string | null>("pick_repository_folder");
+export function pickRepositoryFolder(prompt: string | null = null): Promise<string | null> {
+  return call<string | null>("pick_repository_folder", { prompt });
 }
 
 export function createRepository(path: string): Promise<RepositoryState> {
   return call("create_repository", { path });
 }
 
-export function cloneRepository(url: string, path: string): Promise<RepositoryState> {
-  return call("clone_repository", { url, path });
+/** Streams `git clone --progress` updates to `onProgress` while it runs. */
+export async function cloneRepository(
+  request: CloneRequest,
+  onProgress?: (progress: CloneProgress) => void,
+): Promise<RepositoryState> {
+  if (hasTauri) {
+    const { invoke, Channel } = await import("@tauri-apps/api/core");
+    const channel = new Channel<CloneProgress>();
+    if (onProgress) channel.onmessage = onProgress;
+    return invoke<RepositoryState>("clone_repository", { request, onProgress: channel });
+  }
+  const { demoClone } = await import("./demo");
+  return demoClone(request, onProgress);
+}
+
+/** Stops the running clone; resolves false when none is running. */
+export function cancelClone(): Promise<boolean> {
+  return call("cancel_clone");
+}
+
+export function inspectCloneTarget(path: string): Promise<CloneTarget> {
+  return call("inspect_clone_target", { path });
+}
+
+/** The subset of `paths` that already hold a git checkout. */
+export function existingCheckouts(paths: string[]): Promise<string[]> {
+  return call("existing_checkouts", { paths });
 }
 
 export function applyHunk(patch: string, mode: "stage" | "unstage" | "discard"): Promise<GitResult> {
@@ -121,8 +150,18 @@ export function ghStatus(): Promise<GhStatus> {
   return call("gh_status");
 }
 
-export function ghRepoList(owner: string | null, limit: number | null): Promise<GhRepo[]> {
-  return call("gh_repo_list", { owner, limit });
+/** Every repository the `gh` account can reach, across all owners. */
+export function ghRepoList(): Promise<GhRepo[]> {
+  return call("gh_repo_list");
+}
+
+/** `owner/name` a fork was made from, or null. */
+export function ghRepoParent(nameWithOwner: string): Promise<string | null> {
+  return call("gh_repo_parent", { nameWithOwner });
+}
+
+export function listRemoteBranches(url: string): Promise<RemoteBranches> {
+  return call("list_remote_branches", { url });
 }
 
 export function getRebasePlan(base: string | null): Promise<RebasePlan> {

@@ -29,10 +29,15 @@ provides a dense desktop workflow:
 - Ref-to-ref compare view: pick any two branches, remote branches, tags, or commits (or
   shift-click two commits in the graph), toggle since-merge-base vs. direct diffing, and
   review the ahead/behind commit list alongside per-file diffs.
-- Clone from GitHub through the installed `gh` CLI: browse and filter your repositories
-  (or any owner/org) and clone in one click; falls back to a manual URL/path form when
-  `gh` isn't installed or isn't signed in. gitc never handles or stores GitHub
-  credentials itself — it only shells out to your existing `gh` login.
+- Clone from GitHub through the installed `gh` CLI: choose where to clone to, then pick
+  from every repository your account can reach (yours, your organizations', and ones you
+  collaborate on) in a searchable dropdown grouped by owner, with an owner filter. Paste a
+  GitHub URL to jump to it. Clones show live progress and can be stopped; the destination
+  is checked first (an existing checkout of the same repo opens instead). Options cover
+  branch (a dropdown of the remote's branches), shallow clone, and submodules, and forks
+  get an `upstream` remote. The URL tab takes any git URL or `owner/repo` shorthand.
+  gitc never handles or stores GitHub credentials itself — it only shells out to your
+  existing `gh` login (including as the HTTPS credential helper for the clone).
 - Interactive rebase (**experimental**): reorder, reword, squash, fixup, or drop commits
   onto a chosen base, plus a plain "rebase onto" action from the Actions menu, a commit's
   detail panel, or a branch's sidebar row. Scope is intentionally narrow: no `edit` or

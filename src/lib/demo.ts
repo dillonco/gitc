@@ -1,6 +1,9 @@
 import type {
   BranchAudit,
   BranchCleanupReport,
+  CloneProgress,
+  CloneRequest,
+  CloneTarget,
   CommitDetail,
   CommitFileChange,
   CommitNode,
@@ -13,6 +16,7 @@ import type {
   GitResult,
   RebasePlan,
   RebaseStep,
+  RemoteBranches,
   RefCompare,
   RepositoryState,
   StashEntry,
@@ -457,6 +461,7 @@ const demoGhRepos: GhRepo[] = [
     name: "gitc-plugins",
     nameWithOwner: "octo-org/gitc-plugins",
     owner: "octo-org",
+    ownerIsOrg: true,
     description: "Community plugins for gitc",
     isPrivate: false,
     isFork: false,
@@ -467,7 +472,112 @@ const demoGhRepos: GhRepo[] = [
     language: "TypeScript",
     defaultBranch: "main",
   },
+  {
+    name: "design-tokens",
+    nameWithOwner: "octo-org/design-tokens",
+    owner: "octo-org",
+    ownerIsOrg: true,
+    description: "Shared colour, type and spacing tokens",
+    isPrivate: true,
+    isFork: false,
+    isArchived: false,
+    pushedAt: "2026-08-27T11:00:00Z",
+    url: "https://github.com/octo-org/design-tokens",
+    sshUrl: "git@github.com:octo-org/design-tokens.git",
+    language: "CSS",
+    defaultBranch: "main",
+  },
+  {
+    name: "infra",
+    nameWithOwner: "northwind/infra",
+    owner: "northwind",
+    ownerIsOrg: true,
+    description: "Terraform for the shared environments",
+    isPrivate: true,
+    isFork: false,
+    isArchived: false,
+    pushedAt: "2026-09-02T16:20:00Z",
+    url: "https://github.com/northwind/infra",
+    sshUrl: "git@github.com:northwind/infra.git",
+    language: "HCL",
+    defaultBranch: "trunk",
+  },
 ];
+
+const demoGhParents: Record<string, string> = { "christine/dotfiles": "shell-guild/dotfiles" };
+
+
+// Folders that already exist under any clone directory in the demo, keyed by
+// their last path segment: `gitc` is already cloned (so the dialog offers to
+// open it) and `old-render-engine` is an unrelated non-empty folder.
+const demoExistingFolders: Record<string, { isRepo: boolean; originUrl: string | null }> = {
+  gitc: { isRepo: true, originUrl: "git@github.com:christine/gitc.git" },
+  "old-render-engine": { isRepo: false, originUrl: null },
+};
+
+function demoFolder(path: string) {
+  return demoExistingFolders[path.replace(/\/+$/, "").split("/").at(-1) ?? ""] ?? null;
+}
+
+function demoCloneTarget(path: string): CloneTarget {
+  const folder = demoFolder(path);
+  return {
+    path,
+    exists: Boolean(folder),
+    isDir: Boolean(folder),
+    isEmpty: false,
+    isRepo: folder?.isRepo ?? false,
+    originUrl: folder?.originUrl ?? null,
+  };
+}
+
+let demoCloneCancelled: (() => void) | null = null;
+
+const demoClonePhases: [string, number][] = [
+  ["Enumerating objects", 1],
+  ["Counting objects", 4],
+  ["Compressing objects", 4],
+  ["Receiving objects", 10],
+  ["Resolving deltas", 5],
+  ["Updating files", 3],
+];
+
+/** Simulated `clone_repository`: streams fake progress and honours cancel. */
+export function demoClone(
+  request: CloneRequest,
+  onProgress?: (progress: CloneProgress) => void,
+): Promise<RepositoryState> {
+  const path = request.path.trim();
+  if (!request.url.trim()) return Promise.reject(new Error("repository url must not be empty"));
+  if (demoFolder(path)) return Promise.reject(new Error(`${path} already exists and is not an empty folder.`));
+  const steps: CloneProgress[] = [{ phase: "Connecting", percent: null, line: `Cloning into '${path}'...` }];
+  for (const [phase, count] of demoClonePhases) {
+    for (let i = 1; i <= count; i += 1) {
+      const percent = Math.round((i / count) * 100);
+      const size = phase === "Receiving objects" ? `, ${(percent * 0.042).toFixed(2)} MiB | 3.10 MiB/s` : "";
+      steps.push({ phase, percent, line: `${phase}: ${percent}% (${percent * 12}/1200)${size}` });
+    }
+  }
+  return new Promise((resolve, reject) => {
+    let index = 0;
+    const timer = setInterval(() => {
+      if (index < steps.length) {
+        onProgress?.(steps[index]);
+        index += 1;
+        return;
+      }
+      clearInterval(timer);
+      demoCloneCancelled = null;
+      demo.root = path;
+      resolve(repositoryState());
+    }, 90);
+    demoCloneCancelled = () => {
+      clearInterval(timer);
+      demoCloneCancelled = null;
+      reject(new Error("Clone cancelled."));
+    };
+  });
+}
 
 function ok(stdout = ""): GitResult {
   return { ok: true, stdout, stderr: "", code: 0, refresh: true };
@@ -798,7 +908,13 @@ function resolveDemoRef(ref: string): DemoCommit {
   const byHash = demoCommits.find((entry) => entry.hash === trimmed || entry.shortHash === trimmed);
   if (byHash) return byHash;
   const byLabel = demoCommits.find((entry) =>
-    entry.refs.some((label) => label === trimmed || label === `HEAD -> ${trimmed}` || label === `tag:${trimmed}`),
+    entry.refs.some(
+      (label) =>
+        label === trimmed ||
+        label === `HEAD -> ${trimmed}` ||
+        label === `tag:${trimmed}` ||
+        (trimmed === "HEAD" && (label === "HEAD" || label.startsWith("HEAD -> "))),
+    ),
   );
   if (byLabel) return byLabel;
   throw new Error(`unknown ref '${ref}'`);
@@ -1008,7 +1124,7 @@ export async function demoInvoke<T>(command: string, args: Record<string, unknow
     case "get_commit_graph":
       return { commits: demoCommits.map(({ date, body, files, ...node }) => ({ ...node })) } as T;
     case "get_commit_detail": {
-      const found = demoCommits.find((entry) => entry.hash === args.hash);
+      const found = demoCommits.find((entry) => entry.hash === args.hash) ?? resolveDemoRef(String(args.hash));
       if (!found) throw new Error(`unknown commit ${String(args.hash)}`);
       const detail: CommitDetail = {
         hash: found.hash,
@@ -1090,9 +1206,17 @@ export async function demoInvoke<T>(command: string, args: Record<string, unknow
       return repositoryState() as T;
     }
     case "create_repository":
-    case "clone_repository":
       demo.root = String(args.path);
       return repositoryState() as T;
+    case "cancel_clone": {
+      const cancel = demoCloneCancelled;
+      cancel?.();
+      return Boolean(cancel) as T;
+    }
+    case "inspect_clone_target":
+      return demoCloneTarget(String(args.path)) as T;
+    case "existing_checkouts":
+      return (args.paths as string[]).filter((path) => demoFolder(path)?.isRepo) as T;
     case "open_terminal":
       return fail("terminal is unavailable in browser demo mode") as T;
     case "pick_repository_folder":
@@ -1121,11 +1245,14 @@ export async function demoInvoke<T>(command: string, args: Record<string, unknow
         protocol: "https",
         message: null,
       } as GhStatus as T;
-    case "gh_repo_list": {
-      const owner = typeof args.owner === "string" && args.owner.trim() ? args.owner.trim().toLowerCase() : null;
-      const limit = typeof args.limit === "number" && args.limit > 0 ? args.limit : 100;
-      const repos = owner ? demoGhRepos.filter((repo) => repo.owner.toLowerCase() === owner) : demoGhRepos;
-      return repos.slice(0, limit) as T;
+    case "gh_repo_list":
+      return [...demoGhRepos].sort((a, b) => (b.pushedAt ?? "").localeCompare(a.pushedAt ?? "")) as T;
+    case "gh_repo_parent":
+      return (demoGhParents[String(args.nameWithOwner)] ?? null) as T;
+    case "list_remote_branches": {
+      const repo = demoGhRepos.find((entry) => String(args.url).toLowerCase().includes(entry.nameWithOwner.toLowerCase()));
+      const defaultBranch = repo?.defaultBranch ?? "main";
+      return { defaultBranch, branches: [defaultBranch, "develop", "release/2026.09", "feature/avatars"] } as RemoteBranches as T;
     }
     case "get_rebase_plan":
       return rebasePlan((args.base as string | null | undefined) ?? null) as T;
