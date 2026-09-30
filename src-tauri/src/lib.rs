@@ -8,6 +8,7 @@ use tauri::State;
 
 // ---- Feature modules (one per work stream; keep alphabetical) ----
 mod cleanup;
+mod clone;
 mod compare;
 mod gh;
 mod rebase;
@@ -16,6 +17,8 @@ mod test_support;
 
 struct AppState {
     repo_root: Mutex<PathBuf>,
+    /// Set while a clone runs; `cancel_clone` flips it.
+    clone_cancel: Mutex<Option<std::sync::Arc<std::sync::atomic::AtomicBool>>>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -568,11 +571,15 @@ fn open_terminal(state: State<'_, AppState>) -> Result<GitResult, String> {
 }
 
 #[tauri::command(async)]
-fn pick_repository_folder() -> Result<Option<String>, String> {
+fn pick_repository_folder(prompt: Option<String>) -> Result<Option<String>, String> {
+    let prompt = prompt.unwrap_or_else(|| "Select a repository folder".to_string());
+    // Passed as an argv item rather than spliced into the script, so the
+    // prompt text never needs AppleScript escaping.
     let result = run_command(
         Command::new("osascript").args([
             "-e",
-            "try\nset chosenFolder to choose folder with prompt \"Select a repository folder\"\nreturn POSIX path of chosenFolder\non error number -128\nreturn \"\"\nend try",
+            "on run argv\ntry\nset chosenFolder to choose folder with prompt (item 1 of argv)\nreturn POSIX path of chosenFolder\non error number -128\nreturn \"\"\nend try\nend run",
+            &prompt,
         ]),
         false,
     );
@@ -607,33 +614,6 @@ fn create_repository(state: State<'_, AppState>, path: String) -> Result<Reposit
 }
 
 #[tauri::command(async)]
-fn clone_repository(
-    state: State<'_, AppState>,
-    url: String,
-    path: String,
-) -> Result<RepositoryState, String> {
-    let target = PathBuf::from(path);
-    let parent = target
-        .parent()
-        .ok_or_else(|| "clone target must have a parent directory".to_string())?;
-    fs::create_dir_all(parent).map_err(|err| err.to_string())?;
-    let target_arg = target
-        .to_str()
-        .ok_or_else(|| "clone target path is not valid UTF-8".to_string())?;
-    // Separate options from operands so a URL beginning with `-` cannot be
-    // parsed as a git option (e.g. `--upload-pack=...`).
-    let result = run_git(parent, &["clone", "--", &url, target_arg]);
-    if !result.ok {
-        return Err(result.stderr);
-    }
-    *state
-        .repo_root
-        .lock()
-        .map_err(|_| "repository state lock is poisoned".to_string())? = discover_repo_root(&target)?;
-    get_repository_state(state)
-}
-
-#[tauri::command(async)]
 fn save_conflict_resolution(
     state: State<'_, AppState>,
     path: String,
@@ -655,6 +635,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(AppState {
             repo_root: Mutex::new(default_repo_root()),
+            clone_cancel: Mutex::new(None),
         })
         .invoke_handler(tauri::generate_handler![
             get_repository_state,
@@ -667,7 +648,6 @@ pub fn run() {
             open_terminal,
             pick_repository_folder,
             create_repository,
-            clone_repository,
             apply_hunk,
             get_file_diff,
             get_file_content,
@@ -677,10 +657,16 @@ pub fn run() {
             save_conflict_resolution,
             // ---- stream commands (stubs land in Stage 0; bodies per stream) ----
             cleanup::get_branch_cleanup,
+            clone::clone_repository,
+            clone::cancel_clone,
+            clone::inspect_clone_target,
+            clone::existing_checkouts,
+            clone::list_remote_branches,
             compare::get_ref_compare,
             compare::get_ref_file_diff,
             gh::gh_status,
             gh::gh_repo_list,
+            gh::gh_repo_parent,
             rebase::get_rebase_plan,
             rebase::run_interactive_rebase,
         ])

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { GitAction, GitResult, RepositoryState } from "./types";
+import type { CommitDetail, GitAction, GitResult, RepositoryState } from "./types";
 
 // Each test gets a fresh copy of the module so mutations to its in-memory
 // state (demo.files, demo.branches, ...) never leak between tests.
@@ -171,5 +171,15 @@ describe("demo backend", () => {
   it("rejects an unknown commit hash", async () => {
     const demoInvoke = await loadDemo();
     await expect(demoInvoke("get_commit_detail", { hash: "deadbeef" })).rejects.toThrow();
+  });
+});
+
+describe("demo backend: amend support", () => {
+  it("resolves HEAD to the checked-out commit's full message", async () => {
+    vi.resetModules();
+    const { demoInvoke } = await import("./demo");
+    const head = await demoInvoke<CommitDetail>("get_commit_detail", { hash: "HEAD" });
+    expect(head.subject).toBe("feat: commit detail panel with file diffs");
+    expect(head.body).toContain("Show metadata");
   });
 });

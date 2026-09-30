@@ -178,6 +178,7 @@ export interface GhRepo {
   name: string;
   nameWithOwner: string;
   owner: string;
+  ownerIsOrg?: boolean;
   description?: string | null;
   isPrivate: boolean;
   isFork: boolean;
@@ -187,6 +188,37 @@ export interface GhRepo {
   sshUrl: string;
   language?: string | null;
   defaultBranch?: string | null;
+  /** `owner/name` of the repository this fork came from. */
+  parent?: string | null;
+}
+
+export interface CloneRequest {
+  url: string;
+  path: string;
+  branch?: string | null;
+  depth?: number | null;
+  recurseSubmodules?: boolean;
+  upstreamUrl?: string | null;
+}
+
+export interface CloneProgress {
+  phase: string;
+  percent?: number | null;
+  line: string;
+}
+
+export interface RemoteBranches {
+  defaultBranch?: string | null;
+  branches: string[];
+}
+
+export interface CloneTarget {
+  path: string;
+  exists: boolean;
+  isDir: boolean;
+  isEmpty: boolean;
+  isRepo: boolean;
+  originUrl?: string | null;
 }
 
 

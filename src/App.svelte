@@ -403,13 +403,14 @@
     }
   }
 
-  async function execute(action: GitAction, label: string) {
+  /** Runs a git action; resolves true only when it succeeded. */
+  async function execute(action: GitAction, label: string): Promise<boolean> {
     if (
       riskyActions.has(action.kind) &&
       settings.confirmRisky &&
       !confirm(`${label} can rewrite or discard repository state. Continue?`)
     ) {
-      return;
+      return false;
     }
 
     actionsOpen = false;
@@ -443,11 +444,63 @@
         if (stillThere) await openFile(selectedFile);
         else closeFileView();
       }
+      return result.ok;
     } catch (err) {
       error = String(err);
+      return false;
     } finally {
       busy = false;
     }
+  }
+
+  // Amend: ticking the box loads the previous commit's summary and
+  // description into the composer, keeping whatever was typed so unticking
+  // can put it back (unless the loaded message has since been edited).
+  let amendDraft: { message: string; description: string } | null = null;
+  let amendLoaded: { message: string; description: string } | null = null;
+  let amendLoading = false;
+
+  async function setAmend(checked: boolean) {
+    amendCommit = checked;
+    if (checked) {
+      amendDraft = { message: commitMessage, description: commitDescription };
+      amendLoaded = null;
+      amendLoading = true;
+      try {
+        const head = await getCommitDetail("HEAD");
+        if (!amendCommit) return;
+        commitMessage = head.subject;
+        commitDescription = head.body.trim();
+        amendLoaded = { message: commitMessage, description: commitDescription };
+      } catch (err) {
+        error = `Could not load the previous commit: ${String(err)}`;
+      } finally {
+        amendLoading = false;
+      }
+      return;
+    }
+    const untouched =
+      !amendLoaded || (commitMessage === amendLoaded.message && commitDescription === amendLoaded.description);
+    if (amendDraft && untouched) {
+      commitMessage = amendDraft.message;
+      commitDescription = amendDraft.description;
+    }
+    amendDraft = null;
+    amendLoaded = null;
+  }
+
+  async function commitChanges() {
+    const amending = amendCommit;
+    const done = await execute(
+      { kind: amending ? "commitAmend" : "commit", message: fullCommitMessage },
+      amending ? "Amend commit" : "Commit",
+    );
+    if (!done) return;
+    commitMessage = "";
+    commitDescription = "";
+    amendCommit = false;
+    amendDraft = null;
+    amendLoaded = null;
   }
 
   async function loadCommitDetail(hash: string) {
@@ -1595,9 +1648,9 @@
       <div class="launchpad">
         <h1>Repositories</h1>
         <div class="launch-actions">
-          <button on:click={switchRepository}>▰ Open</button>
-          <button on:click={() => (cloneOpen = true)}>☁ Clone</button>
-          <button on:click={openCreatePrompt}>⊞ Create</button>
+          <button on:click={switchRepository}>Open</button>
+          <button on:click={() => (cloneOpen = true)}>Clone</button>
+          <button on:click={openCreatePrompt}>Create</button>
         </div>
         <section class="recent-repos">
           <h2>Recent</h2>
@@ -2038,7 +2091,15 @@
           <div class="commit-tabs">
             <button class="commit-tab">-o- Commit</button>
           </div>
-          <label class="checkbox"><input type="checkbox" bind:checked={amendCommit} /> Amend previous commit</label>
+          <label class="checkbox">
+            <input
+              type="checkbox"
+              checked={amendCommit}
+              disabled={busy || !state || state.head === "unborn"}
+              on:change={(event) => setAmend(event.currentTarget.checked)}
+            />
+            Amend previous commit{amendLoading ? "…" : ""}
+          </label>
           <div class="commit-box">
             <label class="commit-input" for="commit-message">
               <input id="commit-message" bind:value={commitMessage} maxlength="72" placeholder="Commit summary" />
@@ -2078,8 +2139,8 @@
           </details>
           <button
             class="commit-button"
-            on:click={() => execute({ kind: amendCommit ? "commitAmend" : "commit", message: fullCommitMessage }, amendCommit ? "Amend commit" : "Commit")}
-            disabled={busy || !commitMessage.trim() || staged.length === 0}
+            on:click={commitChanges}
+            disabled={busy || amendLoading || !commitMessage.trim() || (!amendCommit && staged.length === 0)}
           >
             {commitMessage.trim() ? (amendCommit ? "Amend Previous Commit" : "Commit Staged Changes") : "-o- Type a Message to Commit"}
           </button>
@@ -2139,6 +2200,11 @@
         clonePath={settings.clonePath}
         onClose={() => (cloneOpen = false)}
         onCloned={afterClone}
+        showAvatars={settings.showAvatars}
+        onOpenExisting={async (path) => {
+          cloneOpen = false;
+          await openRepositoryPath(path);
+        }}
       />
     {/await}
   {/if}
@@ -2161,7 +2227,7 @@
           </label>
           <div class="field">
             <label for="settings-clone-path">Default clone / create directory</label>
-            <input id="settings-clone-path" bind:value={settings.clonePath} placeholder="/path/to/dev" />
+            <input id="settings-clone-path" bind:value={settings.clonePath} placeholder="~/dev" />
           </div>
           <div class="field">
             <label for="settings-graph-limit">Commits loaded in graph (25–1000)</label>
