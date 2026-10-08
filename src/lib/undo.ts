@@ -93,7 +93,7 @@ export function undoEntryFor(
       };
 
     case "createBranch":
-      // gitc creates branches with `checkout -b`, so undo steps back off it first.
+      // kGit creates branches with `checkout -b`, so undo steps back off it first.
       if (!branch || after.currentBranch !== branch) return null;
       return {
         label: `create ${branch}`,

@@ -396,7 +396,7 @@ pub(crate) fn is_squash_merged(root: &Path, base: &str, branch: &str, tree: &str
         Some(value) => value,
         None => return Ok(false),
     };
-    match git_optional(root, &["commit-tree", tree, "-p", &merge_base, "-m", "gitc-squash-probe"])? {
+    match git_optional(root, &["commit-tree", tree, "-p", &merge_base, "-m", "kgit-squash-probe"])? {
         Some(probe) => {
             let cherry = git(root, &["cherry", base, &probe])?;
             Ok(cherry.trim_start().starts_with('-'))
@@ -584,7 +584,7 @@ mod tests {
         commit_all(origin.path(), "init");
 
         let clone_path = std::env::temp_dir().join(format!(
-            "gitc-test-clone-{}-{}",
+            "kgit-test-clone-{}-{}",
             std::process::id(),
             REPO_COUNTER.fetch_add(1, Ordering::SeqCst)
         ));
@@ -594,7 +594,7 @@ mod tests {
         );
         // A fresh clone inherits no identity from the source repository, and CI
         // has no global git config, so configure it the way `TempRepo` does.
-        run(&clone_path, &["config", "user.email", "test@gitc.dev"]);
+        run(&clone_path, &["config", "user.email", "test@kgit.dev"]);
         run(&clone_path, &["config", "user.name", "Test User"]);
         run(&clone_path, &["config", "commit.gpgsign", "false"]);
         run(&clone_path, &["checkout", "-b", "feature/gone"]);
@@ -655,7 +655,7 @@ mod tests {
         run(repo.path(), &["branch", "wt-branch"]);
 
         let wt_path = std::env::temp_dir().join(format!(
-            "gitc-test-wt-{}-{}",
+            "kgit-test-wt-{}-{}",
             std::process::id(),
             REPO_COUNTER.fetch_add(1, Ordering::SeqCst)
         ));

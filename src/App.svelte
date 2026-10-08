@@ -68,7 +68,7 @@
   };
 
   const seedRecentRepos: RecentRepo[] = [
-    { name: "gitc", path: "/Users/dillon/Documents/dev/gitc" },
+    { name: "kgit", path: "/Users/dillon/Documents/dev/kgit" },
     { name: "meetings", path: "/Users/dillon/Documents/dev/meetings" },
     { name: "data-layer", path: "/Users/dillon/Documents/dev/data-layer" },
     { name: "waas", path: "/Users/dillon/Documents/dev/waas" },
@@ -205,7 +205,7 @@
   function setPullMode(kind: string) {
     settings = { ...settings, pullMode: kind };
     try {
-      localStorage.setItem("gitc:settings", JSON.stringify(settings));
+      localStorage.setItem("kgit:settings", JSON.stringify(settings));
     } catch {
       /* localStorage unavailable */
     }
@@ -242,7 +242,7 @@
   $: totalChanges = state?.files.length ?? 0;
   $: wipModified = unstaged.length;
   $: wipAdded = untracked.length + staged.filter((file) => file.index === "A").length;
-  $: repoName = state?.root.split("/").filter(Boolean).at(-1) ?? "gitc";
+  $: repoName = state?.root.split("/").filter(Boolean).at(-1) ?? "kGit";
   $: accountName = state?.userName?.trim() || "Local";
   $: fullCommitMessage = commitDescription.trim()
     ? `${commitMessage.trim()}\n\n${commitDescription.trim()}`
@@ -289,7 +289,7 @@
 
   function loadSettings(): Settings {
     try {
-      return { ...defaultSettings, ...JSON.parse(localStorage.getItem("gitc:settings") ?? "{}") };
+      return { ...defaultSettings, ...JSON.parse(localStorage.getItem("kgit:settings") ?? "{}") };
     } catch {
       return { ...defaultSettings };
     }
@@ -299,7 +299,7 @@
     settings.graphLimit = Math.min(1000, Math.max(25, Math.round(Number(settings.graphLimit)) || 250));
     settings.staleDays = Math.min(3650, Math.max(1, Math.round(Number(settings.staleDays)) || 30));
     try {
-      localStorage.setItem("gitc:settings", JSON.stringify(settings));
+      localStorage.setItem("kgit:settings", JSON.stringify(settings));
     } catch {
       /* localStorage unavailable */
     }
@@ -310,7 +310,7 @@
 
   function loadRecentRepos(): RecentRepo[] {
     try {
-      const stored = JSON.parse(localStorage.getItem("gitc:recentRepos") ?? "null");
+      const stored = JSON.parse(localStorage.getItem("kgit:recentRepos") ?? "null");
       if (Array.isArray(stored) && stored.length) return stored;
     } catch {
       /* fall through to seeds */
@@ -321,7 +321,7 @@
   function rememberRepo(path: string, name: string) {
     recentRepos = [{ name, path }, ...recentRepos.filter((repo) => repo.path !== path)].slice(0, 12);
     try {
-      localStorage.setItem("gitc:recentRepos", JSON.stringify(recentRepos));
+      localStorage.setItem("kgit:recentRepos", JSON.stringify(recentRepos));
     } catch {
       /* localStorage unavailable */
     }
@@ -1315,7 +1315,7 @@
           <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15" /><circle cx="18" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><path d="M18 9a9 9 0 0 1-9 9" /></svg>
           <span>Branch</span>
         </button>
-        <button title={totalChanges ? "Stash all changes" : "Nothing to stash"} on:click={() => execute({ kind: "stashCreate", message: "gitc stash" }, "Create stash")} disabled={busy || totalChanges === 0}>
+        <button title={totalChanges ? "Stash all changes" : "Nothing to stash"} on:click={() => execute({ kind: "stashCreate", message: "kGit stash" }, "Create stash")} disabled={busy || totalChanges === 0}>
           <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v9" /><path d="m8 8 4 4 4-4" /><path d="M3 14h5l1.5 2.5h5L16 14h5v7H3z" /></svg>
           <span>Stash</span>
         </button>
@@ -1350,8 +1350,8 @@
             <button
               on:click={() => {
                 actionsOpen = false;
-                const message = prompt("Stash message", "gitc stash");
-                if (message != null) execute({ kind: "stashCreate", message: message.trim() || "gitc stash" }, "Create stash");
+                const message = prompt("Stash message", "kGit stash");
+                if (message != null) execute({ kind: "stashCreate", message: message.trim() || "kGit stash" }, "Create stash");
               }}
             >
               Stash With Message…

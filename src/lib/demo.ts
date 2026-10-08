@@ -169,7 +169,7 @@ interface DemoState {
 }
 
 const demo: DemoState = {
-  root: "/Users/christine/dev/gitc",
+  root: "/Users/christine/dev/kgit",
   currentBranch: "feature/commit-details",
   merging: false,
   rebasing: false,
@@ -259,7 +259,7 @@ const demo: DemoState = {
   ],
   worktrees: [
     {
-      path: "/Users/christine/dev/gitc",
+      path: "/Users/christine/dev/kgit",
       head: "d41f22a1",
       branch: "feature/commit-details",
       detached: false,
@@ -271,7 +271,7 @@ const demo: DemoState = {
       prunable: false,
     },
     {
-      path: "/Users/christine/dev/gitc-release",
+      path: "/Users/christine/dev/kgit-release",
       head: "9c31e07b",
       branch: "release/0.2",
       detached: false,
@@ -283,7 +283,7 @@ const demo: DemoState = {
       prunable: false,
     },
     {
-      path: "/Volumes/scratch/gitc-bisect",
+      path: "/Volumes/scratch/kgit-bisect",
       head: "77aa41c0",
       branch: null,
       detached: true,
@@ -388,16 +388,16 @@ const demoGhLogin = "christine";
 
 const demoGhRepos: GhRepo[] = [
   {
-    name: "gitc",
-    nameWithOwner: "christine/gitc",
+    name: "kgit",
+    nameWithOwner: "christine/kgit",
     owner: "christine",
     description: "A desktop git client built for the agent era",
     isPrivate: false,
     isFork: false,
     isArchived: false,
     pushedAt: "2026-09-05T19:24:10Z",
-    url: "https://github.com/christine/gitc",
-    sshUrl: "git@github.com:christine/gitc.git",
+    url: "https://github.com/christine/kgit",
+    sshUrl: "git@github.com:christine/kgit.git",
     language: "Rust",
     defaultBranch: "main",
   },
@@ -458,17 +458,17 @@ const demoGhRepos: GhRepo[] = [
     defaultBranch: "master",
   },
   {
-    name: "gitc-plugins",
-    nameWithOwner: "octo-org/gitc-plugins",
+    name: "kgit-plugins",
+    nameWithOwner: "octo-org/kgit-plugins",
     owner: "octo-org",
     ownerIsOrg: true,
-    description: "Community plugins for gitc",
+    description: "Community plugins for kgit",
     isPrivate: false,
     isFork: false,
     isArchived: false,
     pushedAt: "2026-09-01T17:30:00Z",
-    url: "https://github.com/octo-org/gitc-plugins",
-    sshUrl: "git@github.com:octo-org/gitc-plugins.git",
+    url: "https://github.com/octo-org/kgit-plugins",
+    sshUrl: "git@github.com:octo-org/kgit-plugins.git",
     language: "TypeScript",
     defaultBranch: "main",
   },
@@ -508,10 +508,10 @@ const demoGhParents: Record<string, string> = { "christine/dotfiles": "shell-gui
 
 
 // Folders that already exist under any clone directory in the demo, keyed by
-// their last path segment: `gitc` is already cloned (so the dialog offers to
+// their last path segment: `kgit` is already cloned (so the dialog offers to
 // open it) and `old-render-engine` is an unrelated non-empty folder.
 const demoExistingFolders: Record<string, { isRepo: boolean; originUrl: string | null }> = {
-  gitc: { isRepo: true, originUrl: "git@github.com:christine/gitc.git" },
+  kgit: { isRepo: true, originUrl: "git@github.com:christine/kgit.git" },
   "old-render-engine": { isRepo: false, originUrl: null },
 };
 
@@ -598,7 +598,7 @@ function repositoryState(): RepositoryState {
     files: demo.files.map((entry) => ({ ...entry })),
     branches: demo.branches.map((entry) => ({ ...entry })),
     remotes: ["origin"],
-    remoteUrls: { origin: "git@github.com:wareness/gitc.git" },
+    remoteUrls: { origin: "git@github.com:wareness/kgit.git" },
     remoteBranches: ["origin/main", "origin/feature/commit-details", "origin/release/0.2"],
     tags: [...demo.tags],
     worktrees: demo.worktrees.map((entry) => ({ ...entry, current: entry.path === demo.root })),
@@ -779,7 +779,7 @@ function runAction(action: GitAction): GitResult {
     }
     case "stashCreate":
       demo.stashes = [
-        { name: "stash@{0}", message: `On ${demo.currentBranch || "HEAD"}: ${action.message ?? "gitc stash"}` },
+        { name: "stash@{0}", message: `On ${demo.currentBranch || "HEAD"}: ${action.message ?? "kGit stash"}` },
         ...demo.stashes.map((entry, index) => ({ ...entry, name: `stash@{${index + 1}}` })),
       ];
       demo.files = demo.files.filter((entry) => entry.group === "conflicted");

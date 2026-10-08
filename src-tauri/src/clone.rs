@@ -527,7 +527,7 @@ mod tests {
 
     fn scratch(name: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!(
-            "gitc-clone-{name}-{}-{}",
+            "kgit-clone-{name}-{}-{}",
             std::process::id(),
             REPO_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
         ));
@@ -550,7 +550,7 @@ mod tests {
         let enumerating = parse_progress("remote: Enumerating objects: 1234, done.").unwrap();
         assert_eq!(enumerating.phase, "Enumerating objects");
         assert_eq!(enumerating.percent, None);
-        assert_eq!(parse_progress("Cloning into 'gitc'...").unwrap().phase, "Connecting");
+        assert_eq!(parse_progress("Cloning into 'kgit'...").unwrap().phase, "Connecting");
     }
 
     #[test]

@@ -35,29 +35,29 @@ function ghRepoList(demoInvoke: Invoke) {
 
 describe("cloneUtils.suggestClonePath", () => {
   it("joins the clone directory and the repo name from an https url", () => {
-    expect(suggestClonePath("https://github.com/dillonco/gitc.git", "/Users/dillon/dev")).toBe(
-      "/Users/dillon/dev/gitc",
+    expect(suggestClonePath("https://github.com/dillonco/kgit.git", "/Users/dillon/dev")).toBe(
+      "/Users/dillon/dev/kgit",
     );
   });
 
   it("strips a trailing .git regardless of case", () => {
-    expect(suggestClonePath("https://github.com/dillonco/gitc.GIT", "/dev")).toBe("/dev/gitc");
+    expect(suggestClonePath("https://github.com/dillonco/kgit.GIT", "/dev")).toBe("/dev/kgit");
   });
 
   it("handles the scp-like ssh form", () => {
-    expect(suggestClonePath("git@github.com:dillonco/gitc.git", "/dev")).toBe("/dev/gitc");
+    expect(suggestClonePath("git@github.com:dillonco/kgit.git", "/dev")).toBe("/dev/kgit");
   });
 
   it("handles a url with no .git suffix", () => {
-    expect(suggestClonePath("https://github.com/dillonco/gitc", "/dev")).toBe("/dev/gitc");
+    expect(suggestClonePath("https://github.com/dillonco/kgit", "/dev")).toBe("/dev/kgit");
   });
 
   it("tolerates a trailing slash on the clone directory", () => {
-    expect(suggestClonePath("https://github.com/dillonco/gitc.git", "/dev/")).toBe("/dev/gitc");
+    expect(suggestClonePath("https://github.com/dillonco/kgit.git", "/dev/")).toBe("/dev/kgit");
   });
 
   it("tolerates a trailing slash on the url", () => {
-    expect(suggestClonePath("https://github.com/dillonco/gitc/", "/dev")).toBe("/dev/gitc");
+    expect(suggestClonePath("https://github.com/dillonco/kgit/", "/dev")).toBe("/dev/kgit");
   });
 
   it("falls back to 'repo' for an empty url", () => {
@@ -67,18 +67,18 @@ describe("cloneUtils.suggestClonePath", () => {
 
 describe("cloneUtils.githubRepoRef", () => {
   it.each([
-    ["dillonco/gitc", "dillonco/gitc"],
-    ["github.com/dillonco/gitc", "dillonco/gitc"],
-    ["https://github.com/dillonco/gitc.git", "dillonco/gitc"],
-    ["https://github.com/dillonco/gitc/tree/main/src", "dillonco/gitc"],
-    ["git@github.com:dillonco/gitc.git", "dillonco/gitc"],
-    ["ssh://git@github.com/dillonco/gitc", "dillonco/gitc"],
+    ["dillonco/kgit", "dillonco/kgit"],
+    ["github.com/dillonco/kgit", "dillonco/kgit"],
+    ["https://github.com/dillonco/kgit.git", "dillonco/kgit"],
+    ["https://github.com/dillonco/kgit/tree/main/src", "dillonco/kgit"],
+    ["git@github.com:dillonco/kgit.git", "dillonco/kgit"],
+    ["ssh://git@github.com/dillonco/kgit", "dillonco/kgit"],
     ["https://github.com/dillonco/my.repo", "dillonco/my.repo"],
   ])("reads %s", (input, expected) => {
     expect(githubRepoRef(input)).toBe(expected);
   });
 
-  it.each(["gitc", "https://gitlab.com/a/b", "/Users/me/repo", "a/b/c", ""])("rejects %s", (input) => {
+  it.each(["kgit", "https://gitlab.com/a/b", "/Users/me/repo", "a/b/c", ""])("rejects %s", (input) => {
     expect(githubRepoRef(input)).toBeNull();
   });
 });
@@ -121,8 +121,8 @@ describe("cloneUtils display helpers", () => {
       { text: "Lay", match: true },
       { text: "er", match: false },
     ]);
-    expect(highlightParts("gitc", "")).toEqual([{ text: "gitc", match: false }]);
-    expect(highlightParts("gitc", "zz")).toEqual([{ text: "gitc", match: false }]);
+    expect(highlightParts("kgit", "")).toEqual([{ text: "kgit", match: false }]);
+    expect(highlightParts("kgit", "zz")).toEqual([{ text: "kgit", match: false }]);
   });
 
   it("colours known languages and greys unknown ones", () => {
@@ -134,9 +134,9 @@ describe("cloneUtils display helpers", () => {
 
 describe("cloneUtils paths", () => {
   it("splits and joins parent and folder name", () => {
-    expect(splitPath("/Users/me/dev/gitc/")).toEqual({ parent: "/Users/me/dev", name: "gitc" });
-    expect(splitPath("/gitc")).toEqual({ parent: "/", name: "gitc" });
-    expect(joinPath("~/dev/", "gitc")).toBe("~/dev/gitc");
+    expect(splitPath("/Users/me/dev/kgit/")).toEqual({ parent: "/Users/me/dev", name: "kgit" });
+    expect(splitPath("/kgit")).toEqual({ parent: "/", name: "kgit" });
+    expect(joinPath("~/dev/", "kgit")).toBe("~/dev/kgit");
     expect(joinPath("/dev", "")).toBe("");
   });
 });
@@ -153,16 +153,16 @@ describe("cloneUtils.filterRepos", () => {
     sshUrl: `git@github.com:${nameWithOwner}.git`,
     ...extra,
   });
-  const repos = [repo("a/gitc"), repo("a/gitc-plugins"), repo("b/tools", { description: "Git helpers", language: "Go" })];
+  const repos = [repo("a/kgit"), repo("a/kgit-plugins"), repo("b/tools", { description: "Git helpers", language: "Go" })];
 
   it("matches across owner/name, description and exact language", () => {
-    expect(filterRepos(repos, "a/gi").map((r) => r.name)).toEqual(["gitc", "gitc-plugins"]);
+    expect(filterRepos(repos, "a/kg").map((r) => r.name)).toEqual(["kgit", "kgit-plugins"]);
     expect(filterRepos(repos, "helpers").map((r) => r.name)).toEqual(["tools"]);
     expect(filterRepos(repos, "go").map((r) => r.name)).toEqual(["tools"]);
   });
 
   it("narrows a pasted URL to its exact repository", () => {
-    expect(filterRepos(repos, "https://github.com/a/gitc").map((r) => r.nameWithOwner)).toEqual(["a/gitc"]);
+    expect(filterRepos(repos, "https://github.com/a/kgit").map((r) => r.nameWithOwner)).toEqual(["a/kgit"]);
   });
 
   it("groups by owner with the signed-in account first", () => {
@@ -186,7 +186,7 @@ describe("demo backend: gh_status / gh_repo_list", () => {
     const demoInvoke = await loadDemo();
     const repos = await ghRepoList(demoInvoke);
     expect(repos.length).toBeGreaterThanOrEqual(6);
-    expect(repos.some((repo) => repo.name === "gitc")).toBe(true);
+    expect(repos.some((repo) => repo.name === "kgit")).toBe(true);
   });
 
   it("includes organization repositories alongside the user's own", async () => {
@@ -199,7 +199,7 @@ describe("demo backend: gh_status / gh_repo_list", () => {
   it("looks up a fork's parent", async () => {
     const demoInvoke = await loadDemo();
     expect(await demoInvoke("gh_repo_parent", { nameWithOwner: "christine/dotfiles" })).toBe("shell-guild/dotfiles");
-    expect(await demoInvoke("gh_repo_parent", { nameWithOwner: "christine/gitc" })).toBeNull();
+    expect(await demoInvoke("gh_repo_parent", { nameWithOwner: "christine/kgit" })).toBeNull();
   });
 });
 
@@ -213,12 +213,12 @@ describe("demo backend: clone", () => {
 
   it("reports an existing checkout and a free path", async () => {
     const demoInvoke = await loadDemo();
-    const taken = await demoInvoke<CloneTarget>("inspect_clone_target", { path: "/dev/gitc" });
+    const taken = await demoInvoke<CloneTarget>("inspect_clone_target", { path: "/dev/kgit" });
     expect(taken.isRepo).toBe(true);
     const free = await demoInvoke<CloneTarget>("inspect_clone_target", { path: "/dev/brand-new" });
     expect(free.exists).toBe(false);
-    const found = await demoInvoke<string[]>("existing_checkouts", { paths: ["/dev/gitc", "/dev/waas"] });
-    expect(found).toEqual(["/dev/gitc"]);
+    const found = await demoInvoke<string[]>("existing_checkouts", { paths: ["/dev/kgit", "/dev/waas"] });
+    expect(found).toEqual(["/dev/kgit"]);
   });
 
   it("streams progress and can be cancelled", async () => {

@@ -126,7 +126,7 @@ export function groupByOwner(repos: GhRepo[], self: string | null | undefined): 
 // Listing repositories through `gh` takes a second or two, so the last list
 // is kept (in memory and across launches): the picker fills instantly and
 // refreshes in the background.
-const REPO_CACHE_KEY = "gitc.clone.repos.v2";
+const REPO_CACHE_KEY = "kgit.clone.repos.v2";
 let repoListCache: GhRepo[] | null = null;
 
 export function cachedRepoList(): GhRepo[] | null {
@@ -159,7 +159,7 @@ export function clearRepoListCache() {
   }
 }
 
-const LAST_PARENT_KEY = "gitc.clone.lastParent";
+const LAST_PARENT_KEY = "kgit.clone.lastParent";
 
 /** The folder the last clone went into, if the user picked one. */
 export function lastCloneParent(): string | null {

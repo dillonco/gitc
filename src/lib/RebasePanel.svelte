@@ -107,7 +107,7 @@
     busy = true;
     error = "";
     try {
-      const result = await runGitAction({ kind: "stashCreate", message: "gitc: before rebase" });
+      const result = await runGitAction({ kind: "stashCreate", message: "kGit: before rebase" });
       if (!result.ok) {
         error = result.stderr || result.stdout || "Could not stash changes";
       } else {

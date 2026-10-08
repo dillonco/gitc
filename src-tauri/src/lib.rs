@@ -671,7 +671,7 @@ pub fn run() {
             rebase::run_interactive_rebase,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running gitc");
+        .expect("error while running kGit");
 }
 
 fn default_repo_root() -> PathBuf {
@@ -854,7 +854,7 @@ fn action_args(action: &GitAction) -> Result<Vec<&str>, String> {
         "pullRebase" => vec!["pull", "--rebase", remote],
         "push" => vec!["push", "-u", remote, "HEAD"],
         "forcePush" => vec!["push", "--force-with-lease", remote, "HEAD"],
-        "stashCreate" => vec!["stash", "push", "-u", "-m", message.unwrap_or("gitc stash")],
+        "stashCreate" => vec!["stash", "push", "-u", "-m", message.unwrap_or("kGit stash")],
         "stashApply" => vec!["stash", "apply", required(target, "target")?],
         "stashPop" => vec!["stash", "pop", required(target, "target")?],
         "stashDrop" => vec!["stash", "drop", required(target, "target")?],
@@ -1520,14 +1520,14 @@ u UU N... 100644 100644 100644 100644 a b c d conflicted.txt";
 
     #[test]
     fn parses_remote_urls_preferring_fetch() {
-        let out = "origin\tgit@github.com:octo-org/gitc.git (fetch)\n\
-origin\tgit@github.com:octo-org/gitc.git (push)\n\
-mirror\thttps://push.example.com/gitc.git (push)\n\
-mirror\thttps://example.com/gitc.git (fetch)\n";
+        let out = "origin\tgit@github.com:octo-org/kgit.git (fetch)\n\
+origin\tgit@github.com:octo-org/kgit.git (push)\n\
+mirror\thttps://push.example.com/kgit.git (push)\n\
+mirror\thttps://example.com/kgit.git (fetch)\n";
         let urls = parse_remote_urls(out);
         assert_eq!(urls.len(), 2);
-        assert_eq!(urls["origin"], "git@github.com:octo-org/gitc.git");
-        assert_eq!(urls["mirror"], "https://example.com/gitc.git");
+        assert_eq!(urls["origin"], "git@github.com:octo-org/kgit.git");
+        assert_eq!(urls["mirror"], "https://example.com/kgit.git");
     }
 
     #[test]
@@ -1689,7 +1689,7 @@ mod git_integration_tests {
         assert_eq!(graph.commits[1].subject, "first");
         assert_eq!(graph.commits[0].parents.len(), 1);
         assert!(graph.commits[0].refs.iter().any(|r| r.contains("main")));
-        assert_eq!(graph.commits[0].email, "test@gitc.dev");
+        assert_eq!(graph.commits[0].email, "test@kgit.dev");
     }
 
     #[test]
@@ -2060,7 +2060,7 @@ mod git_integration_tests {
         run(origin.path(), &["checkout", "main"]);
 
         let clone_dir =
-            std::env::temp_dir().join(format!("gitc-clone-{}", std::process::id()));
+            std::env::temp_dir().join(format!("kgit-clone-{}", std::process::id()));
         fs::remove_dir_all(&clone_dir).ok();
         run(
             std::env::temp_dir().as_path(),
@@ -2213,7 +2213,7 @@ mod git_integration_tests {
 
     #[test]
     fn discover_repo_root_errors_outside_any_repository() {
-        let dir = std::env::temp_dir().join(format!("gitc-notrepo-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("kgit-notrepo-{}", std::process::id()));
         fs::create_dir_all(&dir).unwrap();
         assert!(discover_repo_root(&dir).is_err());
         fs::remove_dir_all(&dir).ok();
@@ -2225,7 +2225,7 @@ mod git_integration_tests {
         write_file(origin.path(), "a.txt", "one\n");
         commit_all(origin.path(), "seed");
 
-        let target = std::env::temp_dir().join(format!("gitc-clonetgt-{}", std::process::id()));
+        let target = std::env::temp_dir().join(format!("kgit-clonetgt-{}", std::process::id()));
         fs::remove_dir_all(&target).ok();
         let parent = target.parent().unwrap();
         let result = run_git(
@@ -2308,14 +2308,14 @@ mod git_integration_tests {
         write_file(origin.path(), "a.txt", "one\n");
         commit_all(origin.path(), "seed");
 
-        let clone_dir = std::env::temp_dir().join(format!("gitc-pull-{}", std::process::id()));
+        let clone_dir = std::env::temp_dir().join(format!("kgit-pull-{}", std::process::id()));
         fs::remove_dir_all(&clone_dir).ok();
         run(
             std::env::temp_dir().as_path(),
             &["clone", origin.path().to_str().unwrap(), clone_dir.to_str().unwrap()],
         );
         // A plain clone has no local identity; this test commits into it directly.
-        run(&clone_dir, &["config", "user.email", "test@gitc.dev"]);
+        run(&clone_dir, &["config", "user.email", "test@kgit.dev"]);
         run(&clone_dir, &["config", "user.name", "Test User"]);
         run(&clone_dir, &["config", "commit.gpgsign", "false"]);
 
@@ -2339,7 +2339,7 @@ mod git_integration_tests {
         commit_all(origin.path(), "seed");
         run(origin.path(), &["branch", "feature"]);
 
-        let clone_dir = std::env::temp_dir().join(format!("gitc-pull-noup-{}", std::process::id()));
+        let clone_dir = std::env::temp_dir().join(format!("kgit-pull-noup-{}", std::process::id()));
         fs::remove_dir_all(&clone_dir).ok();
         run(
             std::env::temp_dir().as_path(),
@@ -2480,24 +2480,24 @@ mod git_integration_tests {
     #[test]
     fn parses_worktree_porcelain_metadata() {
         let out = "\
-worktree /repos/gitc
+worktree /repos/kgit
 HEAD 1111111111111111111111111111111111111111
 branch refs/heads/main
 
-worktree /repos/gitc-review
+worktree /repos/kgit-review
 HEAD 2222222222222222222222222222222222222222
 branch refs/heads/feature/review
 locked demo machine
 
-worktree /repos/gitc-old
+worktree /repos/kgit-old
 HEAD 3333333333333333333333333333333333333333
 detached
 prunable gitdir file points to non-existent location
 ";
-        let worktrees = parse_worktrees(out, Path::new("/repos/gitc-review"));
+        let worktrees = parse_worktrees(out, Path::new("/repos/kgit-review"));
 
         assert_eq!(worktrees.len(), 3);
-        assert_eq!(worktrees[0].path, "/repos/gitc");
+        assert_eq!(worktrees[0].path, "/repos/kgit");
         assert_eq!(worktrees[0].branch.as_deref(), Some("main"));
         assert_eq!(worktrees[0].head, "11111111");
         assert!(worktrees[0].main);
@@ -2518,39 +2518,39 @@ prunable gitdir file points to non-existent location
     #[test]
     fn builds_worktree_action_args() {
         let mut add = act("worktreeAdd");
-        add.path = Some("/repos/gitc-fix".to_string());
+        add.path = Some("/repos/kgit-fix".to_string());
         add.branch = Some("fix/lanes".to_string());
         assert_eq!(
             action_args(&add).unwrap(),
-            vec!["worktree", "add", "/repos/gitc-fix", "fix/lanes"]
+            vec!["worktree", "add", "/repos/kgit-fix", "fix/lanes"]
         );
 
         add.mode = Some("new".to_string());
         add.target = Some("main".to_string());
         assert_eq!(
             action_args(&add).unwrap(),
-            vec!["worktree", "add", "-b", "fix/lanes", "/repos/gitc-fix", "main"]
+            vec!["worktree", "add", "-b", "fix/lanes", "/repos/kgit-fix", "main"]
         );
 
         let mut detach = act("worktreeAdd");
         detach.mode = Some("detach".to_string());
-        detach.path = Some("/repos/gitc-v1".to_string());
+        detach.path = Some("/repos/kgit-v1".to_string());
         detach.target = Some("v0.1.0".to_string());
         assert_eq!(
             action_args(&detach).unwrap(),
-            vec!["worktree", "add", "--detach", "/repos/gitc-v1", "v0.1.0"]
+            vec!["worktree", "add", "--detach", "/repos/kgit-v1", "v0.1.0"]
         );
 
         let mut remove = act("worktreeRemove");
-        remove.path = Some("/repos/gitc-fix".to_string());
+        remove.path = Some("/repos/kgit-fix".to_string());
         assert_eq!(
             action_args(&remove).unwrap(),
-            vec!["worktree", "remove", "/repos/gitc-fix"]
+            vec!["worktree", "remove", "/repos/kgit-fix"]
         );
         remove.kind = "worktreeRemoveForce".to_string();
         assert_eq!(
             action_args(&remove).unwrap(),
-            vec!["worktree", "remove", "--force", "/repos/gitc-fix"]
+            vec!["worktree", "remove", "--force", "/repos/kgit-fix"]
         );
 
         assert_eq!(
@@ -2574,7 +2574,7 @@ prunable gitdir file points to non-existent location
         assert!(action_args(&add).is_err(), "blank paths must be rejected");
 
         let mut add = act("worktreeAdd");
-        add.path = Some("/repos/gitc-fix".to_string());
+        add.path = Some("/repos/kgit-fix".to_string());
         assert!(action_args(&add).is_err(), "branch is required");
     }
 
@@ -2585,7 +2585,7 @@ prunable gitdir file points to non-existent location
         commit_all(repo.path(), "init");
 
         let linked = std::env::temp_dir().join(format!(
-            "gitc-test-wt-{}-{}",
+            "kgit-test-wt-{}-{}",
             std::process::id(),
             REPO_COUNTER.fetch_add(1, Ordering::SeqCst)
         ));
@@ -2670,10 +2670,10 @@ prunable gitdir file points to non-existent location
 
     #[test]
     fn default_base_branch_falls_back_to_current_branch_without_main_or_master() {
-        let dir = std::env::temp_dir().join(format!("gitc-test-trunk-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("kgit-test-trunk-{}", std::process::id()));
         fs::create_dir_all(&dir).expect("create temp repo dir");
         run(&dir, &["init", "-b", "trunk"]);
-        run(&dir, &["config", "user.email", "test@gitc.dev"]);
+        run(&dir, &["config", "user.email", "test@kgit.dev"]);
         run(&dir, &["config", "user.name", "Test User"]);
         run(&dir, &["config", "commit.gpgsign", "false"]);
         write_file(&dir, "a.txt", "one\n");
