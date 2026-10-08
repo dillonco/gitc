@@ -633,6 +633,8 @@ fn save_conflict_resolution(
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .manage(AppState {
             repo_root: Mutex::new(default_repo_root()),
             clone_cancel: Mutex::new(None),
