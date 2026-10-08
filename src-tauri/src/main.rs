@@ -1,3 +1,3 @@
 fn main() {
-    gitc_lib::run()
+    kgit_lib::run()
 }

@@ -154,7 +154,7 @@ pub(crate) fn interactive_rebase(root: &Path, base: &str, steps: &[RebaseStep]) 
     // survive a conflict stop; clean up anything left from a previous run —
     // safe now, since the checks above already confirmed nothing is in
     // progress.
-    let msg_dir = git_dir.join("gitc-rebase");
+    let msg_dir = git_dir.join("kgit-rebase");
     fs::remove_dir_all(&msg_dir).ok();
     fs::create_dir_all(&msg_dir).map_err(|err| err.to_string())?;
 
@@ -163,7 +163,7 @@ pub(crate) fn interactive_rebase(root: &Path, base: &str, steps: &[RebaseStep]) 
     fs::write(&todo_path, &todo).map_err(|err| err.to_string())?;
 
     let script_path = msg_dir.join("sequence-editor.sh");
-    fs::write(&script_path, "#!/bin/sh\ncp \"$GITC_REBASE_TODO\" \"$1\"\n").map_err(|err| err.to_string())?;
+    fs::write(&script_path, "#!/bin/sh\ncp \"$KGIT_REBASE_TODO\" \"$1\"\n").map_err(|err| err.to_string())?;
     {
         use std::os::unix::fs::PermissionsExt;
         fs::set_permissions(&script_path, fs::Permissions::from_mode(0o755)).map_err(|err| err.to_string())?;
@@ -179,7 +179,7 @@ pub(crate) fn interactive_rebase(root: &Path, base: &str, steps: &[RebaseStep]) 
         &["rebase", "-i", "--no-autosquash", base],
         &[
             ("GIT_SEQUENCE_EDITOR", script_arg.as_str()),
-            ("GITC_REBASE_TODO", todo_arg.as_str()),
+            ("KGIT_REBASE_TODO", todo_arg.as_str()),
             ("GIT_EDITOR", "true"),
         ],
     ))
@@ -674,7 +674,7 @@ mod tests {
         run(repo.path(), &["checkout", "main"]);
 
         let worktree_dir = std::env::temp_dir().join(format!(
-            "gitc-rebase-worktree-{}-{}",
+            "kgit-rebase-worktree-{}-{}",
             std::process::id(),
             REPO_COUNTER.fetch_add(1, Ordering::SeqCst)
         ));

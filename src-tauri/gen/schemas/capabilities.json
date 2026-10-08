@@ -1,1 +1,1 @@
-{"default":{"identifier":"default","description":"Default permissions for gitc","local":true,"windows":["main"],"permissions":["core:default","core:window:allow-start-dragging"]}}
+{"default":{"identifier":"default","description":"Default permissions for kGit","local":true,"windows":["main"],"permissions":["core:default","core:window:allow-start-dragging"]}}

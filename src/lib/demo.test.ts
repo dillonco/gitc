@@ -23,7 +23,7 @@ describe("demo backend", () => {
   it("seeds a repository state with the expected shape", async () => {
     const demoInvoke = await loadDemo();
     const result = await state(demoInvoke);
-    expect(result.root).toBe("/Users/christine/dev/gitc");
+    expect(result.root).toBe("/Users/christine/dev/kgit");
     expect(result.currentBranch).toBe("feature/commit-details");
     expect(result.files).toHaveLength(5);
     expect(result.branches.find((b) => b.current)?.name).toBe("feature/commit-details");
@@ -124,14 +124,14 @@ describe("demo backend", () => {
       kind: "worktreeAdd",
       mode: "new",
       branch: "feature/scratch",
-      path: "/tmp/gitc-scratch",
+      path: "/tmp/kgit-scratch",
     });
     expect(add.ok).toBe(true);
-    expect((await state(demoInvoke)).worktrees.some((w) => w.path === "/tmp/gitc-scratch")).toBe(true);
+    expect((await state(demoInvoke)).worktrees.some((w) => w.path === "/tmp/kgit-scratch")).toBe(true);
 
-    const remove = await act(demoInvoke, { kind: "worktreeRemove", path: "/tmp/gitc-scratch" });
+    const remove = await act(demoInvoke, { kind: "worktreeRemove", path: "/tmp/kgit-scratch" });
     expect(remove.ok).toBe(true);
-    expect((await state(demoInvoke)).worktrees.some((w) => w.path === "/tmp/gitc-scratch")).toBe(false);
+    expect((await state(demoInvoke)).worktrees.some((w) => w.path === "/tmp/kgit-scratch")).toBe(false);
   });
 
   it("prunes only the stale worktree", async () => {

@@ -2,12 +2,12 @@
 
 These sections were intentionally removed from the current UI until they have real backing behavior.
 
-**GitHub clone is no longer future** — gitc can browse and clone your GitHub repositories
+**GitHub clone is no longer future** — kGit can browse and clone your GitHub repositories
 today by shelling out to the installed `gh` CLI (see the README). That deliberately covers
-only clone: it reuses whatever account `gh auth login` already has signed in, and gitc
+only clone: it reuses whatever account `gh auth login` already has signed in, and kgit
 itself never performs OAuth, never requests a token, and never stores credentials. Every
 section below is a *provider account* integration — PRs, Issues, Teams, and Cloud Patches
-all need gitc to hold and act on behalf of a signed-in account (list/act on PRs, look up
+all need kGit to hold and act on behalf of a signed-in account (list/act on PRs, look up
 issues, resolve collaborators, sync patches), which is a materially bigger commitment than
 "run a local CLI the user already authenticated" and remains genuinely future work.
 

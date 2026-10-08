@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <!-- gitc app icon: the commit graph, drawn the way the app draws it.
+  <!-- kGit app icon: the commit graph, drawn the way the app draws it.
        Sized for macOS: an 824px tile on a 1024px canvas, 22.4% corner radius. -->
   <defs>
     <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">

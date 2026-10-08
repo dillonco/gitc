@@ -295,14 +295,14 @@ mod tests {
     #[test]
     fn parses_repo_list_ndjson_sample() {
         let ndjson = concat!(
-            r#"{"name":"gitc","full_name":"dillonco/gitc","owner":{"login":"dillonco","id":1},"description":"","private":false,"fork":false,"archived":false,"pushed_at":"2026-09-05T19:24:10Z","html_url":"https://github.com/dillonco/gitc","ssh_url":"git@github.com:dillonco/gitc.git","language":null,"default_branch":"main"}"#,
+            r#"{"name":"kgit","full_name":"dillonco/kgit","owner":{"login":"dillonco","id":1},"description":"","private":false,"fork":false,"archived":false,"pushed_at":"2026-09-05T19:24:10Z","html_url":"https://github.com/dillonco/kgit","ssh_url":"git@github.com:dillonco/kgit.git","language":null,"default_branch":"main"}"#,
             "\n",
             r#"{"name":"forked","full_name":"some-org/forked","owner":{"login":"some-org","type":"Organization"},"description":"A fork","private":true,"fork":true,"archived":true,"pushed_at":null,"html_url":"https://github.com/some-org/forked","ssh_url":"git@github.com:some-org/forked.git","language":"Rust"}"#,
             "\n"
         );
         let repos = parse_repo_list(ndjson).expect("valid ndjson parses");
         assert_eq!(repos.len(), 2);
-        assert_eq!(repos[0].name_with_owner, "dillonco/gitc");
+        assert_eq!(repos[0].name_with_owner, "dillonco/kgit");
         assert_eq!(repos[0].description, None, "empty string becomes None");
         assert_eq!(repos[0].language, None);
         assert_eq!(repos[0].default_branch.as_deref(), Some("main"));

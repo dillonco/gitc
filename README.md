@@ -1,4 +1,4 @@
-# gitc
+# kGit
 
 A small-footprint desktop git client built with Tauri, Svelte, TypeScript, and Rust.
 
@@ -36,7 +36,7 @@ provides a dense desktop workflow:
   is checked first (an existing checkout of the same repo opens instead). Options cover
   branch (a dropdown of the remote's branches), shallow clone, and submodules, and forks
   get an `upstream` remote. The URL tab takes any git URL or `owner/repo` shorthand.
-  gitc never handles or stores GitHub credentials itself — it only shells out to your
+  kGit never handles or stores GitHub credentials itself — it only shells out to your
   existing `gh` login (including as the HTTPS credential helper for the clone).
 - Interactive rebase (**experimental**): reorder, reword, squash, fixup, or drop commits
   onto a chosen base, plus a plain "rebase onto" action from the Actions menu, a commit's
@@ -62,7 +62,7 @@ npm run build
 `npm run build` produces a macOS app bundle at:
 
 ```text
-src-tauri/target/release/bundle/macos/gitc.app
+src-tauri/target/release/bundle/macos/kGit.app
 ```
 
 ## License

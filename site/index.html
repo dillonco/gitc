@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>gitc</title>
+<title>kGit</title>
 <link rel="icon" type="image/svg+xml" href="icon.svg" />
 <meta name="description" content="A small desktop git client built on the git CLI. Rust and Tauri, not Electron." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -276,7 +276,7 @@
 <header class="hero">
   <div class="wrap">
     <p class="eyebrow"><span class="rail"></span>Desktop git client</p>
-    <h1 class="mark">gitc</h1>
+    <h1 class="mark">kGit</h1>
     <p class="lede">Runs the git you already have. Rust and Tauri underneath, so it starts like a native app and not a browser.</p>
     <p class="meta">
       <span><b>macOS</b> app bundle</span>
@@ -284,7 +284,7 @@
       <span>no Electron</span>
     </p>
     <figure class="shot">
-      <img src="./shots/graph.png" alt="The gitc window: branch tree on the left, commit graph with coloured lanes in the middle, commit detail on the right." width="1400" />
+      <img src="./shots/graph.png" alt="The kGit window: branch tree on the left, commit graph with coloured lanes in the middle, commit detail on the right." width="1400" />
     </figure>
   </div>
 </header>
@@ -295,7 +295,7 @@
     <div class="col">
       <h2 id="clean-up-h">The branches git won't delete</h2>
       <p><code>git branch --merged</code> can't see a squash merge. The commits are on main, the branch isn't an ancestor of it, and <code>-d</code> refuses.</p>
-      <p>gitc checks whether the branch's tree is already reachable, so squash-merged work shows up next to the ordinary kind — with what's gone from the remote, and what nobody has touched in a month.</p>
+      <p>kGit checks whether the branch's tree is already reachable, so squash-merged work shows up next to the ordinary kind — with what's gone from the remote, and what nobody has touched in a month.</p>
       <div class="stat">
         <b>22/53</b>
         <span>branches on one repo here were already merged. <code>--merged</code> listed none of them.</span>
@@ -319,7 +319,7 @@
       <p>Stage, unstage or discard a single hunk. Side-by-side or unified, blame and history on the same file without leaving it.</p>
     </div>
     <figure class="shot">
-      <img src="./shots/diff.png" alt="A file diff in gitc with line numbers, added and removed lines, and stage or discard controls for the hunk." width="1400" loading="lazy" />
+      <img src="./shots/diff.png" alt="A file diff in kGit with line numbers, added and removed lines, and stage or discard controls for the hunk." width="1400" loading="lazy" />
     </figure>
   </div>
 </section>
@@ -361,7 +361,7 @@
 
 <footer>
   <div class="wrap">
-    <a href="https://github.com/dillonco/gitc">github.com/dillonco/gitc</a>
+    <a href="https://github.com/dillonco/kgit">github.com/dillonco/kgit</a>
   </div>
 </footer>
 

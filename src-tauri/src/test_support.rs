@@ -12,13 +12,13 @@ pub(crate) struct TempRepo(PathBuf);
 impl TempRepo {
     pub(crate) fn new() -> Self {
         let dir = std::env::temp_dir().join(format!(
-            "gitc-test-{}-{}",
+            "kgit-test-{}-{}",
             std::process::id(),
             REPO_COUNTER.fetch_add(1, Ordering::SeqCst)
         ));
         fs::create_dir_all(&dir).expect("create temp repo dir");
         run(&dir, &["init", "-b", "main"]);
-        run(&dir, &["config", "user.email", "test@gitc.dev"]);
+        run(&dir, &["config", "user.email", "test@kgit.dev"]);
         run(&dir, &["config", "user.name", "Test User"]);
         run(&dir, &["config", "commit.gpgsign", "false"]);
         TempRepo(dir)
