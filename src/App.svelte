@@ -26,6 +26,8 @@
   import { hoverExpand } from "./lib/hoverExpand";
   import { buildGraphRows, githubOwnerAvatar, isGithubUrl, type GraphRow } from "./lib/graph";
   import { blockedReason, undoableKinds, undoEntryFor, undoItem as toUndoItem, type UndoItem } from "./lib/undo";
+  import { checkForUpdate, installUpdate } from "./lib/updates";
+  import type { Update } from "@tauri-apps/plugin-updater";
   import type {
     Branch,
     CommitDetail,
@@ -130,6 +132,8 @@
   let error = "";
   let notice = "";
   let noticeTimer: ReturnType<typeof setTimeout> | null = null;
+  let availableUpdate: Update | null = null;
+  let installingUpdate = false;
   let filterInput: HTMLInputElement | null = null;
   let cloneOpen = false;
   let pullMenuOpen = false;
@@ -1156,7 +1160,19 @@
     return map[status] ?? status;
   }
 
+  async function restartToUpdate() {
+    if (!availableUpdate) return;
+    installingUpdate = true;
+    try {
+      await installUpdate(availableUpdate);
+    } catch (err) {
+      error = `Update failed: ${err}`;
+      installingUpdate = false;
+    }
+  }
+
   refresh();
+  void checkForUpdate().then((update) => (availableUpdate = update));
 </script>
 
 <svelte:window
@@ -1612,6 +1628,17 @@
       <div class="message ok" role="status">
         <span>{notice}</span>
         <button class="msg-close" title="Dismiss" on:click={() => (notice = "")}>×</button>
+      </div>
+    {/if}
+    {#if availableUpdate}
+      <div class="message update-banner">
+        <span>kGit {availableUpdate.version} is available</span>
+        <div class="banner-actions">
+          <button on:click={restartToUpdate} disabled={installingUpdate}>
+            {installingUpdate ? "Updating…" : "Restart to update"}
+          </button>
+          <button on:click={() => (availableUpdate = null)} disabled={installingUpdate}>Later</button>
+        </div>
       </div>
     {/if}
     {#if state?.merging || state?.rebasing}

@@ -65,6 +65,32 @@ npm run build
 src-tauri/target/release/bundle/macos/kGit.app
 ```
 
+## Releases
+
+kGit ships outside the Mac App Store: it runs your own `git` and `gh` against folders
+anywhere on disk, which the App Store sandbox doesn't allow. Releases are signed with a
+Developer ID certificate, notarized by Apple, and published as GitHub Releases. Installed
+copies check the latest release on launch and offer to restart into it.
+
+To cut a release, bump `version` in `package.json` on `main`, then run the **Release**
+workflow from the Actions tab (or `gh workflow run release.yml`). It builds a universal
+app, signs and notarizes it, and publishes `v<version>` with a `.dmg` for new installs
+and the signed update bundle plus `latest.json` for the updater.
+
+The workflow needs these repository secrets:
+
+| Secret | What it is |
+| --- | --- |
+| `APPLE_CERTIFICATE` | Developer ID Application certificate and key, exported as `.p12`, base64-encoded |
+| `APPLE_CERTIFICATE_PASSWORD` | Password chosen when exporting the `.p12` |
+| `APPLE_API_ISSUER` | App Store Connect API issuer ID (Users and Access → Integrations) |
+| `APPLE_API_KEY_ID` | App Store Connect API key ID |
+| `APPLE_API_PRIVATE_KEY` | Contents of that key's `AuthKey_<id>.p8` |
+| `TAURI_SIGNING_PRIVATE_KEY` | Contents of `~/.tauri/kgit-updater.key`, which signs update bundles |
+
+The updater's public key is in `src-tauri/tauri.conf.json`. Keep the private key: losing
+it means installed copies can no longer verify updates and have to be reinstalled by hand.
+
 ## License
 
 Proprietary — copyright (c) 2026 Dillon, all rights reserved. The source is

@@ -2780,6 +2780,21 @@ summary::-webkit-details-marker {
   font-weight: 700;
 }
 
+.update-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid rgba(79, 209, 181, 0.35);
+  background: rgba(19, 40, 33, 0.85);
+  color: #c8f8e1;
+  font-weight: 700;
+}
+
+.update-banner .banner-actions button {
+  border-color: rgba(79, 209, 181, 0.35);
+}
+
 .banner-actions {
   display: flex;
   gap: 6px;
